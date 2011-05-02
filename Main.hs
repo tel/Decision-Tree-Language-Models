@@ -29,18 +29,6 @@ instance F.Foldable BTree where
 alphabet = "abcdefghijklmnopqrstuvwxyz "
 singletons = map (Leaf . Set.singleton) alphabet
 
--- Agglomerate the forest into a single tree
--- agglom :: Map.Map Bigram Freq -> [BTree (Set.Set Bigram)] -> BTree (Set.Set Bigram)
--- agglom _ (tree:[]) = tree
--- agglom f trees = head trees
---   where f' = Map.mapKeys Set.singleton f
-  
--- agglom_step :: (Map.Map (Set.Set Bigram) Freq, [BTree (Set.Set Bigram)]) ->
---                (Map.Map (Set.Set Bigram) Freq, [BTree (Set.Set Bigram)])
--- agglom_step (f, tree:[]) = (f, [tree])
--- agglom_step (f, trees) = (f', trees')
---   where f' = Map.insert comb comb
-
 -- mutual information under frequency `f` with clustering imposed by
 -- the forest `trees`. This is pretty damn slow, mostly in the
 -- cluster_bf and cluster_uf list comprehensions
@@ -53,15 +41,16 @@ mi :: (F.Foldable t, Ord o) =>
       -> [t (Set.Set o)] 
       -> Float
 mi uf bf trees = sum $ filter (not . isNaN) 
-                 $ {-# SCC "info_prod" #-} [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]
+                 $ {-# SCC "info_prod" #-} 
+                 [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]
   where clusters = map (F.foldMap id) trees
-        cluster_bf c1 c2 = {-# SCC "cl_bf" #-} sum [ freqOf (a, b) bf 
-                               | a <- Set.toList c1
-                               , b <- Set.toList c2 ]
-        cluster_uf c1 = {-# SCC "cl_uf" #-} sum [ freqOf a uf 
-                            | a <- Set.toList c1 ] 
+        cluster_bf c1 c2 = {-# SCC "cl_bf" #-} 
+          sum [ freqOf (a, b) bf | a <- Set.toList c1, b <- Set.toList c2 ]
+        cluster_uf c1 = {-# SCC "cl_uf" #-} 
+          sum [ freqOf a uf | a <- Set.toList c1 ] 
         info c1 c2 = let p = cluster_bf c1 c2
-                     in  {-# SCC "info_comp" #-} p * (log $ p / (cluster_uf c1 * cluster_uf c2))
+                     in  {-# SCC "info_comp" #-} 
+                      p * (log $ p / (cluster_uf c1 * cluster_uf c2))
 uf = unigram_f train
 bf = bigram_f train                        
                      
@@ -79,4 +68,4 @@ agglom uf bf trees = head $ step trees
                     | a <- ts, b <- ts
                     , a /= b ]
                   
-main = print $ agglom uf bf $ map (Leaf . Set.singleton) alpha1
+main = print $ agglom uf bf $ map (Leaf . Set.singleton) alphabet
