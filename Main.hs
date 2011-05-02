@@ -27,7 +27,6 @@ instance F.Foldable BTree where
                
 -- Get our alphabet
 alphabet = "abcdefghijklmnopqrstuvwxyz "
-alpha1 = alphabet -- "abcdfgefghijklmno"
 singletons = map (Leaf . Set.singleton) alphabet
 
 -- Agglomerate the forest into a single tree
@@ -49,7 +48,10 @@ singletons = map (Leaf . Set.singleton) alphabet
 -- TODO: Route a "simplifying" cluster bigram frequency through the
 -- recursion so that freqOf runs more and more quickly
 mi :: (F.Foldable t, Ord o) =>
-      Frequency o -> Frequency (o, o) -> [t (Set.Set o)] -> Float
+      Frequency o 
+      -> Frequency (o, o) 
+      -> [t (Set.Set o)] 
+      -> Float
 mi uf bf trees = sum $ filter (not . isNaN) 
                  $ {-# SCC "info_prod" #-} [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]
   where clusters = map (F.foldMap id) trees
@@ -63,12 +65,11 @@ mi uf bf trees = sum $ filter (not . isNaN)
 uf = unigram_f train
 bf = bigram_f train                        
                      
-agglom
-  :: Ord o =>
-     Frequency o
-     -> Frequency (o, o)
-     -> [BTree (Set.Set o)]
-     -> BTree (Set.Set o)
+agglom :: Ord o => 
+          Frequency o
+          -> Frequency (o, o)
+          -> [BTree (Set.Set o)]
+          -> BTree (Set.Set o)
 agglom uf bf trees = head $ step trees                     
   where step (t:[]) = [t]
         step ts = step $ snd 
@@ -78,6 +79,4 @@ agglom uf bf trees = head $ step trees
                     | a <- ts, b <- ts
                     , a /= b ]
                   
-tree = agglom uf bf $ map (Leaf . Set.singleton) alpha1
-
-main = print tree
+main = print $ agglom uf bf $ map (Leaf . Set.singleton) alpha1
