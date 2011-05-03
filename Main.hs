@@ -1,71 +1,41 @@
-{-# LANGUAGE FlexibleInstances #-}
-
+{-# LANGUAGE FlexibleInstances, UndecidableInstances, TypeSynonymInstances #-}
 module Main where
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.List
 import qualified Data.Foldable as F
+import Data.List
+import Text.ParserCombinators.Parsec
 import Data.Monoid
 
+import qualified ClusterTree as C
+import BTree
 import Text
+import Agglomeration
 
-data BTree a = Split (BTree a) (BTree a)
-             | Leaf a
-             | Empty
-               deriving Eq
-                        
-instance Show (BTree (Set.Set Char)) where
-  show (Leaf x) = (Set.toList x)
-  show (Split l r) = "(" ++ show l ++ " " ++ show r ++ ")"
+-- main = print $ agglom uf bf C.singletons
 
-instance F.Foldable BTree where                        
-  foldMap _ Empty = mempty
-  foldMap f (Leaf x) = f x
-  foldMap f (Split y z) = F.foldMap f y `mappend` F.foldMap f z
-               
--- Get our alphabet
-alphabet = "abcdefghijklmnopqrstuvwxyz "
-singletons = map (Leaf . Set.singleton) alphabet
+tree1 :: BTree Char
+tree1 = fmap (head . Set.toList) $ read "((  (e (u (o (i a))))) (h ((n (l (x r))) ((y (s (g d))) (((t k) (w c)) ((p (b (q j))) (f (m (z v)))))))))"
 
--- mutual information under frequency `f` with clustering imposed by
--- the forest `trees`. This is pretty damn slow, mostly in the
--- cluster_bf and cluster_uf list comprehensions
---
--- TODO: Route a "simplifying" cluster bigram frequency through the
--- recursion so that freqOf runs more and more quickly
-mi :: (F.Foldable t, Ord o) =>
-      Frequency o 
-      -> Frequency (o, o) 
-      -> [t (Set.Set o)] 
-      -> Float
-mi uf bf trees = sum $ filter (not . isNaN) 
-                 $ {-# SCC "info_prod" #-} 
-                 [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]
-  where clusters = map (F.foldMap id) trees
-        cluster_bf c1 c2 = {-# SCC "cl_bf" #-} 
-          sum [ freqOf (a, b) bf | a <- Set.toList c1, b <- Set.toList c2 ]
-        cluster_uf c1 = {-# SCC "cl_uf" #-} 
-          sum [ freqOf a uf | a <- Set.toList c1 ] 
-        info c1 c2 = let p = cluster_bf c1 c2
-                     in  {-# SCC "info_comp" #-} 
-                      p * (log $ p / (cluster_uf c1 * cluster_uf c2))
-uf = unigram_f train
-bf = bigram_f train                        
-                     
-agglom :: Ord o => 
-          Frequency o
-          -> Frequency (o, o)
-          -> [BTree (Set.Set o)]
-          -> BTree (Set.Set o)
-agglom uf bf trees = head $ step trees                     
-  where step (t:[]) = [t]
-        step ts = step $ snd 
-                  $ maximumBy (\a b -> compare (fst a) (fst b))
-                  $ map (\x -> (mi uf bf x, x))
-                  $ [ (Split a b) : (delete b $ delete a ts)
-                    | a <- ts, b <- ts
-                    , a /= b ]
-                  
-main = print $ agglom uf bf $ map (Leaf . Set.singleton) alphabet
+bsenc = bsEncode tree1
+
+splitData :: Float -> [a] -> ([a], [a])
+splitData percentage dat = splitAt (ceiling $ (fromIntegral n)*percentage) dat
+  where n = length dat
+        
+-- Get the development/validation data sets        
+(dev, cross) = splitData 0.8 train
+fourgram :: [d] -> [(d, d, d, d)]
+fourgram os = zip4 os (tail os) (tail $ tail os) (tail $ tail $ tail os)
+bitPredicts
+  :: Ord k => Map.Map k Path -> [(k, k, k, t)] -> Maybe [(t, Path)]
+bitPredicts bs = mapM fn
+  where fn (a, b, c, d) = do Path aenc <- Map.lookup a bs
+                             Path benc <- Map.lookup b bs
+                             Path cenc <- Map.lookup c bs
+                             return $ (d, Path $ cenc ++ benc ++ aenc)
+
+Just dev4g = bitPredicts bsenc $ fourgram dev
+Just cross4g = bitPredicts bsenc $ fourgram cross

@@ -5,7 +5,7 @@ import Data.Maybe (fromMaybe, maybe)
 import qualified Data.Map as Map
 import System.IO.Unsafe
 
-newtype Frequency a = Freq (Map.Map a Float)
+data Frequency a = Freq {fromFreq :: (Map.Map a Float)}
 type Bigram = (Char, Char)
 
 -- Load the actual corpuses. Totally unsafe but a good start.
@@ -25,6 +25,9 @@ obj_freq os = Freq $ Map.map (/ (fromIntegral n)) (obj_counts os)
   where counts = obj_counts os
         n      = length os
         
+-- Base language
+alphabet = "abcdefghijklmnopqrstuvwxyz "
+
 -- Some statistics
 unigram_f :: String -> Frequency Char        
 unigram_f = obj_freq        
