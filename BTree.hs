@@ -22,13 +22,13 @@ instance Functor BTree where
   fmap f (Leaf a) = Leaf (f a)
   fmap f (Split l r ) = Split (fmap f l) (fmap f r)
   
-data Motion = TLeft | TRight
+data Motion = TLeft | TRight deriving (Eq, Ord)
 data Path = Path {unPath :: [Motion]}
 emptyPath = Path []
 
 instance Show Motion where
-  show TLeft = "o"
-  show TRight = "."
+  show TLeft = "."
+  show TRight = "+"
 
 instance Show Path where
   show (Path st) = "<" ++ Prelude.concatMap show st ++ ">"
@@ -42,6 +42,6 @@ bsEncode tree = Map.fromList $ zeroPad $ encodings tree emptyPath
         zeroPad :: [(a, Path)] -> [(a, Path)]
         zeroPad enc = let l = Prelude.maximum $ map (length . unPath . snd) enc
                       in map (\(a, Path bs) -> 
-                               (a, Path $ replicate (l - length bs) TLeft ++ bs)) 
+                               (a, Path $ reverse $ replicate (l - length bs) TLeft ++ bs)) 
                          enc
  
