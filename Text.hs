@@ -28,6 +28,7 @@ obj_freq os = Freq $ Map.map (/ (fromIntegral n)) (obj_counts os)
 -- Base language
 alphabet = "abcdefghijklmnopqrstuvwxyz "
 
+--
 -- Some statistics
 unigram_f :: String -> Frequency Char        
 unigram_f = obj_freq        
