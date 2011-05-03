@@ -16,8 +16,6 @@ import BTree
 import Text
 import Agglomeration
 
--- main = print $ agglom uf bf C.singletons
-
 tree1 :: BTree Char
 tree1 = fmap (head . Set.toList) $ read "((  (e (u (o (i a))))) (h ((n (l (x r))) ((y (s (g d))) (((t k) (w c)) ((p (b (q j))) (f (m (z v)))))))))"
 
@@ -53,3 +51,4 @@ splitEntropy dat = entropy2 . splitByCoordinate
         splitByCoordinate (i, j) = (map fst *** map fst) (partition pred dat)
           where pred :: (t, [Path]) -> Bool
                 pred (_, hist) = unPath (hist !! i) !! j == TLeft
+
