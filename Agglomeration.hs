@@ -2,6 +2,7 @@ module Agglomeration where
 
 import qualified Data.Set as Set
 import qualified Data.Foldable as F
+import Data.Ord (comparing)
 import Data.List
 
 import BTree
@@ -40,7 +41,7 @@ agglom :: Ord o =>
 agglom uf bf trees = fmap (head . Set.toList) $ head $ step trees                     
   where step (t:[]) = [t]
         step ts = step $ snd 
-                  $ maximumBy (\a b -> compare (fst a) (fst b))
+                  $ maximumBy (comparing fst)
                   $ map (\x -> (mi uf bf x, x))
                   $ [ (Split a b) : (delete b $ delete a ts)
                     | a <- ts, b <- ts
