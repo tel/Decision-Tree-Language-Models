@@ -3,10 +3,19 @@ module Text where
 import Data.List
 import Data.Maybe (fromMaybe, maybe)
 import qualified Data.Map as Map
+import Data.Foldable (foldMap, Foldable)
+import Data.Monoid (Sum (..), getSum)
 import System.IO.Unsafe
 
 data Frequency a = Freq {fromFreq :: (Map.Map a Float)}
 type Bigram = (Char, Char)
+
+entropy :: Ord a => [a] -> Float
+entropy = entropyf . obj_freq
+
+entropyf :: Frequency a -> Float
+entropyf freq = getSum $ foldMap fn (fromFreq freq)
+  where fn p = Sum $ -p * log p
 
 -- Load the actual corpuses. Totally unsafe but a good start.
 train = unsafePerformIO $ readFile "textA.txt"
