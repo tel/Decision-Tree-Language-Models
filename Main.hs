@@ -12,15 +12,25 @@ import Data.Monoid
 import Control.Arrow
 
 import qualified ClusterTree as C
-import BTree
+import qualified BTree as BT
+import Motion
 import Text
 import Agglomeration
 
-tree1 :: BTree Char
+tree1 :: BT.BTree Char
 tree1 = fmap (head . Set.toList) $ read "((  (e (u (o (i a))))) (h ((n (l (x r))) ((y (s (g d))) (((t k) (w c)) ((p (b (q j))) (f (m (z v)))))))))"
 
 bsenc :: Map.Map Char Path
-bsenc = bsEncode tree1
+bsenc = BT.bsEncode tree1
+
+splitData :: Float -> [a] -> ([a], [a])
+splitData percentage dat = splitAt (ceiling $ (fromIntegral n)*percentage) dat
+  where n = length dat
+
+-- Get the development/validation data sets        
+(dev, cross) = splitData 0.8 train
+fourgram :: [d] -> [(d, d, d, d)]
+fourgram os = zip4 os (tail os) (tail $ tail os) (tail $ tail $ tail os)
 
 bitPredicts
   :: Ord k => Map.Map k Path -> [(k, k, k, t)] -> Maybe [(t, [Path])]

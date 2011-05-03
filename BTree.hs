@@ -10,6 +10,8 @@ import Data.Functor
 import Data.Monoid
 import qualified Data.Map as Map
 
+import Motion
+
 data BTree a = Split (BTree a) (BTree a)
              | Leaf a
                deriving Eq
@@ -22,17 +24,6 @@ instance Functor BTree where
   fmap f (Leaf a) = Leaf (f a)
   fmap f (Split l r ) = Split (fmap f l) (fmap f r)
   
-data Motion = TLeft | TRight deriving (Eq, Ord)
-data Path = Path {unPath :: [Motion]}
-emptyPath = Path []
-
-instance Show Motion where
-  show TLeft = "."
-  show TRight = "+"
-
-instance Show Path where
-  show (Path st) = "<" ++ Prelude.concatMap show st ++ ">"
-
 bsEncode :: Ord a => BTree a -> Map.Map a Path
 bsEncode tree = Map.fromList $ zeroPad $ encodings tree emptyPath
   where encodings :: BTree a -> Path -> [(a, Path)]
