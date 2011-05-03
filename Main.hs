@@ -40,19 +40,22 @@ bitPredicts bs = mapM fn
                              Path cenc <- Map.lookup c bs
                              return $ (d, [Path cenc, Path benc, Path aenc])
 
+type EncData = [(Char, [Path])]
+
+dev4g, cross4g :: EncData
 Just dev4g = bitPredicts bsenc $ fourgram dev
 Just cross4g = bitPredicts bsenc $ fourgram cross
 
 -- Find the best possible splitting question given a set of data (for
 -- the given node) and a key which states what the currently available
 -- question positions in the bitstream are.
-bestSplit :: [(Char, [Path])] -- Data set to split against
+bestSplit :: EncData -- Data set to split against
              -> [Int]      -- Keys indicating which questions to consider
              -> (Int, Float)
 bestSplit dat key = maximumBy (comparing snd) options
   where options = map (snd &&& splitEntropy dat) (zip [0..] key)
                 
-splitEntropy :: [(Char, [Path])] -> (Int, Int) -> Float
+splitEntropy :: EncData -> (Int, Int) -> Float
 splitEntropy dat = entropy2 . splitByCoordinate
   where entropy2 (left, right) = (nl/n) * (entropy left) + (nr/n) * (entropy right)
           where nl = fromIntegral $ length left
