@@ -51,6 +51,7 @@ data QTree = Split EncIx QTree QTree | Leaf Bool deriving (Show, Eq)
 deadLeaf = Leaf False
 liveLeaf = Leaf True
 
+
 -- Splits the data into two sets based on whether each item's
 -- predictor at EncIx is TLeft (fst) or TRight (snd)
 splitDataWith :: EncIx -> EncData -> (EncData, EncData)
@@ -93,7 +94,12 @@ bestSplit dat mask = maximumBy (comparing snd) splits
                                   in (na/n) * dataEntropy as + (nb/n) * dataEntropy bs
           dataEntropy = entropy . map fst
 
+-- Builds question masks and data splits along the tree, maps them
+-- with the passed function, then returns an accumulation
+-- mapPaths :: QTree -> EncData -> (EncData -> [Int] -> a) -> [(a, Path)]
 
+-- filter a data set along a path through a QTree
+-- treeFilter :: QTree -> Path -> Data -> Data
 
 
 --
