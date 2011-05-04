@@ -18,7 +18,7 @@ mi :: (F.Foldable t, Ord o) =>
       Frequency o 
       -> Frequency (o, o) 
       -> [t (Set.Set o)] 
-      -> Float
+      -> Double
 mi uf bf trees = sum $ filter (not . isNaN) 
                  $ {-# SCC "info_prod" #-} 
                  [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]

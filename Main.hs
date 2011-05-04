@@ -51,7 +51,7 @@ Just cross4g = bitPredicts bsenc $ fourgram cross
 -- question positions in the bitstream are.
 bestSplit :: EncData -- Data set to split against
              -> [Int]      -- Keys indicating which questions to consider
-             -> (Int, Float)
+             -> (Int, Double)
 bestSplit dat key = maximumBy (comparing snd) options
   where options = map (snd &&& splitEntropy dat) (zip [0..] key)
                 

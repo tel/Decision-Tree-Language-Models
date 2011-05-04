@@ -1,4 +1,8 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+
 module Text where
+
+import Foreign.C.Types
 
 import Data.List
 import Data.Maybe (fromMaybe, maybe)
@@ -7,15 +11,21 @@ import Data.Foldable (foldMap, Foldable)
 import Data.Monoid (Sum (..), getSum)
 import System.IO.Unsafe
 
-data Frequency a = Freq {fromFreq :: (Map.Map a Float)}
+data Frequency a = Freq {fromFreq :: (Map.Map a Double)}
 type Bigram = (Char, Char)
 
-entropy :: Ord a => [a] -> Float
+foreign import ccall unsafe "math.h log2"
+  c_log2 :: CDouble -> CDouble
+             
+log2 :: Double -> Double
+log2 x = realToFrac (c_log2 (realToFrac x))
+
+entropy :: Ord a => [a] -> Double
 entropy = entropyf . obj_freq
 
-entropyf :: Frequency a -> Float
+entropyf :: Frequency a -> Double
 entropyf freq = getSum $ foldMap fn (fromFreq freq)
-  where fn p = Sum $ -p * log p
+  where fn p = Sum $ -p * log2 p
 
 -- Load the actual corpuses. Totally unsafe but a good start.
 train = unsafePerformIO $ readFile "textA.txt"
@@ -45,5 +55,5 @@ unigram_f = obj_freq
 bigram_f :: String -> Frequency Bigram
 bigram_f = obj_freq . bigrams
 
-freqOf :: Ord o => o -> Frequency o -> Float
+freqOf :: Ord o => o -> Frequency o -> Double
 freqOf o (Freq f) = fromMaybe 0 (Map.lookup o f)
