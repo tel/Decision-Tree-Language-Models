@@ -1,1 +1,1 @@
-(setl ffip-regexp ".*\\.(hs|py)")
+(setl ffip-regexp ".*\\.hs")
