@@ -23,7 +23,7 @@ tree1 = fmap (head . Set.toList) $ read "((  (e (u (o (i a))))) (h ((n (l (x r))
 bsenc :: Map.Map Char Path
 bsenc = BT.bsEncode tree1
 
-splitData :: Float -> [a] -> ([a], [a])
+splitData :: Double -> [a] -> ([a], [a])
 splitData percentage dat = splitAt (ceiling $ (fromIntegral n)*percentage) dat
   where n = length dat
 
@@ -55,7 +55,7 @@ bestSplit :: EncData -- Data set to split against
 bestSplit dat key = maximumBy (comparing snd) options
   where options = map (snd &&& splitEntropy dat) (zip [0..] key)
                 
-splitEntropy :: EncData -> (Int, Int) -> Float
+splitEntropy :: EncData -> (Int, Int) -> Double
 splitEntropy dat = entropy2 . splitByCoordinate
   where entropy2 (left, right) = (nl/n) * (entropy left) + (nr/n) * (entropy right)
           where nl = fromIntegral $ length left
