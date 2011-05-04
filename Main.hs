@@ -9,6 +9,7 @@ import Data.Ord (comparing)
 import Data.List
 import Text.ParserCombinators.Parsec
 import Data.Monoid
+import Data.Array
 import Control.Arrow
 
 import qualified ClusterTree as C
@@ -16,6 +17,87 @@ import qualified BTree as BT
 import Motion
 import Text
 import Agglomeration
+
+-- Introduce the encoding indices
+-- EncIx :: (History index, Bitstream index)
+type EncIx = (Int, -- History element index
+              Int) -- Within-element bitstream index
+newtype Bitstream = Bitstream (Array EncIx Motion)
+
+instance Show Bitstream where
+  show (Bitstream arr) = concatMap show (elems arr)
+
+type EncData = [(Char, Bitstream)]
+
+bitPredicts :: Map.Map Char Path -> [(Char, Char, Char, Char)] -> Maybe EncData
+bitPredicts bs = mapM fn
+  where fn (a, b, c, d) = do Path aenc <- Map.lookup a bs
+                             Path benc <- Map.lookup b bs
+                             Path cenc <- Map.lookup c bs
+                             let n = length aenc
+                                 full = listArray ((0, 0), (3, n)) 
+                                        (cenc ++ benc ++ aenc)
+                             return $ (d, Bitstream full)
+
+-- Question tree
+--
+-- This datatype represents a binary decision tree that encodes a
+-- question of the form (Split ix l r) ~> "continute to the left
+-- branch if predictor at ix is TLeft and visa versa".
+--
+-- Leaves contain boolean values which determine whether they can
+-- continue growing.
+data QTree = Split EncIx QTree QTree | Leaf Bool deriving (Show, Eq)
+deadLeaf = Leaf False
+liveLeaf = Leaf True
+
+-- Splits the data into two sets based on whether each item's
+-- predictor at EncIx is TLeft (fst) or TRight (snd)
+splitDataWith :: EncIx -> EncData -> (EncData, EncData)
+splitDataWith ix = partition fn
+    where fn (_, Bitstream arr) = arr ! ix == TLeft
+
+
+-- Computes a sample entropy passed to a given Leaf in a QTree
+entropyAtLeaf :: QTree -> Path -> EncData -> Double
+entropyAtLeaf (Leaf _) (Path []) dat = entropy $ map fst dat
+entropyAtLeaf (Leaf _) (Path (m:_)) _ = error "Path does not lead to leaf."
+entropyAtLeaf (Split ix l r) (Path (m:ms)) dat = 
+    case m of
+      TLeft  -> entropyAtLeaf l (Path ms) (fst $ splitDataWith ix dat)
+      TRight -> entropyAtLeaf r (Path ms) (snd $ splitDataWith ix dat)
+
+                          
+-- Splits a leaf adding the particular EncIx constraint to the tree                       
+splitLeaf :: QTree -> Path -> EncIx -> QTree
+splitLeaf (Leaf True) (Path []) ix = Split ix liveLeaf liveLeaf
+splitLeaf (Leaf False) (Path []) ix = error "Cannot split a dead leaf."
+splitLeaf (Leaf _) (Path (m:_)) _ = error "Path does not lead to leaf."
+splitLeaf (Split ixhere l r) (Path (m:ms)) ix = 
+    case m of 
+      TLeft -> Split ixhere (splitLeaf l (Path ms) ix) r
+      TRight -> Split ixhere l (splitLeaf r (Path ms) ix)
+
+        
+-- finds the best possible split of EncData given a bitmask of
+-- previously asked questions
+bestSplit :: EncData -> [Int] -> (EncIx, Double)
+bestSplit dat mask = maximumBy (comparing snd) splits
+    where splits :: [(EncIx, Double)]
+          splits = map (id &&& (\ix -> splitEntropy (splitDataWith ix dat))) indices
+          indices = zip [0..] mask
+          splitEntropy :: (EncData, EncData) -> Double
+          splitEntropy (as, bs) = let na = fromIntegral $ length as
+                                      nb = fromIntegral $ length bs
+                                      n  = na + nb
+                                  in (na/n) * dataEntropy as + (nb/n) * dataEntropy bs
+          dataEntropy = entropy . map fst
+
+
+
+
+--
+-- Test data
 
 tree1 :: BT.BTree Char
 tree1 = fmap (head . Set.toList) $ read "((  (e (u (o (i a))))) (h ((n (l (x r))) ((y (s (g d))) (((t k) (w c)) ((p (b (q j))) (f (m (z v)))))))))"
@@ -32,36 +114,7 @@ splitData percentage dat = splitAt (ceiling $ (fromIntegral n)*percentage) dat
 fourgram :: [d] -> [(d, d, d, d)]
 fourgram os = zip4 os (tail os) (tail $ tail os) (tail $ tail $ tail os)
 
-bitPredicts
-  :: Ord k => Map.Map k Path -> [(k, k, k, t)] -> Maybe [(t, [Path])]
-bitPredicts bs = mapM fn
-  where fn (a, b, c, d) = do Path aenc <- Map.lookup a bs
-                             Path benc <- Map.lookup b bs
-                             Path cenc <- Map.lookup c bs
-                             return $ (d, [Path cenc, Path benc, Path aenc])
-
-type EncData = [(Char, [Path])]
-
+-- Split the data up into fourgrams
 dev4g, cross4g :: EncData
 Just dev4g = bitPredicts bsenc $ fourgram dev
 Just cross4g = bitPredicts bsenc $ fourgram cross
-
--- Find the best possible splitting question given a set of data (for
--- the given node) and a key which states what the currently available
--- question positions in the bitstream are.
-bestSplit :: EncData -- Data set to split against
-             -> [Int]      -- Keys indicating which questions to consider
-             -> (Int, Double)
-bestSplit dat key = maximumBy (comparing snd) options
-  where options = map (snd &&& splitEntropy dat) (zip [0..] key)
-                
-splitEntropy :: EncData -> (Int, Int) -> Double
-splitEntropy dat = entropy2 . splitByCoordinate
-  where entropy2 (left, right) = (nl/n) * (entropy left) + (nr/n) * (entropy right)
-          where nl = fromIntegral $ length left
-                nr = fromIntegral $ length right
-                n  = nl + nr
-        splitByCoordinate (i, j) = (map fst *** map fst) (partition pred dat)
-          where pred :: (t, [Path]) -> Bool
-                pred (_, hist) = unPath (hist !! i) !! j == TLeft
-
