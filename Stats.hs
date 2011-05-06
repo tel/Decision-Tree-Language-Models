@@ -1,6 +1,11 @@
-module Stats (Freq(totalCount), freqFrom, freqOf, countOf, log2, entropy) where
+module Stats 
+    ( Freq(Freq, totalCount), 
+      freqFrom, marginalize, imap,
+      freqOf, countOf, 
+      log2, entropy) where
 
 import Foreign.C.Types
+import Control.Monad (liftM)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
@@ -38,3 +43,18 @@ entropy fr = log2 n - 1/n * 1/(F.sum $ fmap fn (counts fr))
   where n = fromIntegral $ totalCount fr
         fn :: Integer -> Double
         fn = ((\c -> c * (log2 c)) . fromIntegral)
+
+-- compute a marginal frequency from a given frequency such that
+-- p2(b) = \sum_{a : a -> b} p1(a)
+-- use with (fst) and (snd) to get the usual marginals
+--
+-- Technically note that this definition is sufficient to enter Freq
+-- into the Functor typeclass so long as the underlying type a is
+-- Ord. Since Haskell doesn't allow that directly we'll just also
+-- define item map, imap
+marginalize :: Ord b => (a -> b) -> Freq a -> Freq b
+marginalize group (Freq n cts) = Freq n $ F.foldl' fn M.empty (M.toList cts)
+        where fn map (k, v) = M.alter (Just . fromMaybe v . liftM (+v)) (group k) map
+
+imap :: Ord b => (a -> b) -> Freq a -> Freq b
+imap = marginalize
