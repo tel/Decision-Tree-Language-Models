@@ -2,11 +2,14 @@
   FlexibleInstances, 
   OverlappingInstances, 
   TypeSynonymInstances #-}
-module DTree (DTree(..), BTree, bBranch) where              
+module DTree 
+    ( DTree(..), BTree, bBranch,
+      flatten ) where
 
 -- Alright.
-import qualified Data.Foldable as F (Foldable, foldr)
+import qualified Data.Foldable as F (Foldable, foldr, foldMap)
 import Data.Traversable (Traversable, traverse)
+import Data.Monoid (Monoid)
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (liftM)
 import Text.Read (lift, readPrec)
@@ -60,6 +63,9 @@ instance Read (BTree Char) where
 instance Functor (DTree s) where
     f `fmap` (Leaf x) = Leaf (f x)
     f `fmap` (Branch s l r) = Branch s (f `fmap` l) (f `fmap` r)
+
+flatten :: Monoid a => DTree s a -> a
+flatten = F.foldMap id
 
 instance F.Foldable (DTree s) where
     foldr fn a0 (Leaf x) = fn x a0
