@@ -1,50 +1,62 @@
-module Agglomeration where
+module Agglomeration
+    ( unfoldClusterTree,
+      mutualInfo, 
+      BSTree(..), bsSingleton ) where
 
-import qualified Data.Set as Set
-import qualified Data.Foldable as F
+import qualified Data.Set as S
+import Data.List (nub, delete, minimumBy, maximumBy)
 import Data.Ord (comparing)
-import Data.List
+import qualified Data.Foldable as F (sum)
+import Control.Monad (replicateM)
+import Control.Monad.State
+import Control.Arrow
 
-import BTree
-import Text
+import Stats
+import DTree
 
--- mutual information under frequency `f` with clustering imposed by
--- the forest `trees`. This is pretty damn slow, mostly in the
--- cluster_bf and cluster_uf list comprehensions
---
--- TODO: Route a "simplifying" cluster bigram frequency through the
--- recursion so that freqOf runs more and more quickly
-mi :: (F.Foldable t, Ord o) =>
-      Frequency o 
-      -> Frequency (o, o) 
-      -> [t (Set.Set o)] 
-      -> Double
-mi uf bf trees = sum $ filter (not . isNaN) 
-                 $ {-# SCC "info_prod" #-} 
-                 [info c1 c2 | c1 <- clusters, c2 <- clusters, c1 /= c2]
-  where clusters = map (F.foldMap id) trees
-        cluster_bf c1 c2 = {-# SCC "cl_bf" #-} 
-          sum [ freqOf (a, b) bf | a <- Set.toList c1, b <- Set.toList c2 ]
-        cluster_uf c1 = {-# SCC "cl_uf" #-} 
-          sum [ freqOf a uf | a <- Set.toList c1 ] 
-        info c1 c2 = let p = cluster_bf c1 c2
-                     in  {-# SCC "info_comp" #-} 
-                      p * (log $ p / (cluster_uf c1 * cluster_uf c2))
-uf = unigram_f train
-bf = bigram_f train                        
-                     
-agglom :: Ord o => 
-          Frequency o
-          -> Frequency (o, o)
-          -> [BTree (Set.Set o)]
-          -> BTree o
-agglom uf bf trees = fmap (head . Set.toList) $ head $ step trees                     
-  where step (t:[]) = [t]
-        step ts = step $ snd 
-                  $ maximumBy (comparing fst)
-                  $ map (\x -> (mi uf bf x, x))
-                  $ [ (Split a b) : (delete b $ delete a ts)
-                    | a <- ts, b <- ts
-                    , a /= b ]
+-- some types for agglomeration
+type BSTree a = BTree (S.Set a)
+type FreqSt a = (Freq (a, a), Freq a)
+bsSingleton = Leaf . S.singleton
+
+-- iteratively cluster a group of atoms such that at each step the
+-- merged atoms (sets of atoms) are the ones with maximal mutual
+-- information
+-- unfoldClusterTree :: Ord a => Freq (a, a) -> [a] -> BTree a
+unfoldClusterTree freq2g vocab = 
+    fmap (head . S.elems) $ 
+    head $ snd $ execState (replicateM (n-1) stepClustering) ((freq2g, freq1g), atoms)
+    where n = length vocab
+          freq1g = marginalize fst freq2g
+          atoms  = map bsSingleton (nub vocab)
+
+-- perform a single cluster update step
+stepClustering :: (Ord a, Eq a) => State (FreqSt a, [BSTree a]) ()
+stepClustering = do
+  ((bg, ug), trees) <- get
+  let n = length trees
+      merges = do i <- [0..(n-1)]
+                  j <- [(i+1)..(n-1)]
+                  let a = trees !! i
+                      b = trees !! j
+                      m = bBranch a b
+                      t' = delete a (delete b trees)
+                  return ((a, b), m : t')
+      (bestPair, bestSet) = maximumBy (comparing $ mutualInfo bg ug . snd) merges
+  put ((bg, ug), bestSet)
 
 
+-- Compute the mutual information over groupings based on the bigram
+-- and unigram class frequencies
+mutualInfo
+  :: Ord a => Freq (a, a) -> Freq a -> [DTree s (S.Set a)] -> Double
+mutualInfo bg ug trees = sum $ filter (not . isNaN) $ map mi is
+    where n  = length trees
+          is = [(i, j) | i <- [0..(n-1)], j <- [0..(n-1)]]
+          mi (i, j) =  mi' 
+                       (flatten $ fmap S.toList $ trees !! i) 
+                       (flatten $ fmap S.toList $ trees !! j)
+          mi' ci cj = let num = sum $ [freqOf (ai, aj) bg | ai <- ci, aj <- cj]
+                          denom = (F.sum $ fmap (\a -> freqOf a ug) ci) * 
+                                  (F.sum $ fmap (\a -> freqOf a ug) cj)
+                      in num * log2 (num/denom)
