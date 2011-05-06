@@ -1,0 +1,53 @@
+<html>
+  <head>
+    <title>Circle Packing</title>
+    <script type="text/javascript" src="protovis-3.2/protovis-r3.2.js"></script>
+    <script type="text/javascript" src="tree.js"></script>
+    <style type="text/css">
+
+      #fig {
+      width: 800px;
+      height: 800px;
+      margin-top: -300px;
+      }
+
+      #center {
+      height: 200px;
+      overflow: hidden;
+      }
+
+    </style>
+  </head>
+  <body><div id="center"><div id="fig">
+    <script type="text/javascript+protovis">
+
+/* For pretty number formatting. */
+var format = pv.Format.number();
+
+var vis = new pv.Panel()
+    .width(796)
+    .height(796)
+    .margin(2);
+
+var pack = vis.add(pv.Layout.Pack)
+    .nodes(pv.dom(tree).root("tree").nodes())
+    .size(function(d) d.nodeValue);
+
+pack.node.add(pv.Dot)
+    .fillStyle(function(d) d.firstChild ? "rgba(120, 170, 180, .15)" : "#fff")
+    .title(function(d) d.nodeName + (d.firstChild ? "" : ": " + format(d.nodeValue)))
+    .shape("circle")
+    .lineWidth(0);
+
+pack.label.add(pv.Label)
+    .visible(function(d) !d.firstChild)
+    .text(function(d) d.nodeName)
+    .textAlign("center")
+    .textBaseline("middle")
+    .font("10pt/10pt helvetica")
+
+vis.render();
+
+    </script>
+  </div></div></body>
+</html>
