@@ -1,5 +1,8 @@
-{-# LANGUAGE FlexibleInstances, OverlappingInstances, TypeSynonymInstances #-}
-module DTree (DTree(..), BTree) where              
+{-# LANGUAGE 
+  FlexibleInstances, 
+  OverlappingInstances, 
+  TypeSynonymInstances #-}
+module DTree (DTree(..), BTree, bBranch) where              
 
 -- Alright.
 import qualified Data.Foldable as F (Foldable, foldr)
@@ -17,6 +20,10 @@ data DTree s a = Branch s (DTree s a) (DTree s a)
                | Leaf a
                  deriving (Eq, Ord)
 type BTree a = DTree () a
+
+-- A branch overloader for BTrees
+bBranch :: BTree a -> BTree a -> BTree a
+bBranch = Branch ()
 
 --
 -- A few kinds of overloaded shows. Not all will be `Read`able, but this
