@@ -4,6 +4,7 @@ import Foreign.C.Types
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
+import Data.List (foldl')
 
 
 -- The frequency data type encapsulates sample counts and frequencies
@@ -12,8 +13,8 @@ data Freq a = Freq { totalCount :: Integer, counts :: M.Map a Integer }
 -- For any given container which can be folded over, produce a sample
 -- distribution of the objects it contains
 freqFrom :: (F.Foldable t, Ord a) => t a -> Freq a
-freqFrom cont = Freq n $ F.foldr (M.alter (Just . maybe 1 (+1))) M.empty cont
-    where n = F.foldr (\_ -> (+1)) 0 cont
+freqFrom cont = Freq n $ F.foldl' (flip $ M.alter (Just . maybe 1 (+1))) M.empty cont
+    where n = F.foldl' (\a _ -> (a+1)) 0 cont
 
 -- Given a Freq, we should be able to poll it for frequencies and
 -- counts. These are supposed to mimic the interface of M.lookup,
