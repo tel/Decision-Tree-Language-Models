@@ -4,7 +4,7 @@
   TypeSynonymInstances #-}
 module DTree 
     ( DTree(..), BTree, bBranch,
-      flatten ) where
+      flatten, pathMap ) where
 
 -- Alright.
 import qualified Data.Foldable as F (Foldable, foldr, foldMap)
@@ -14,6 +14,7 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad (liftM)
 import Text.Read (lift, readPrec)
 import Text.ParserCombinators.ReadP
+import Data.Map as M
 
 -- The general decision tree type. It's particularly important to note
 -- that types can be stored at both branch and leaf nodes (important
@@ -74,3 +75,14 @@ instance F.Foldable (DTree s) where
 instance Traversable (DTree s) where
     traverse f (Leaf x) = Leaf <$> f x
     traverse f (Branch s l r) = Branch s <$> traverse f l <*> traverse f r
+
+--
+-- Path functions
+
+data Dir = L | R deriving Show
+type Path = [Dir]
+
+pathMap :: Ord a => DTree s a -> M.Map a Path
+pathMap tree = pathMap' tree []
+    where pathMap' (Leaf x) path = M.singleton x (reverse path)
+          pathMap' (Branch _ l r) path = (pathMap' l (L:path)) `M.union` (pathMap' r (R:path))
