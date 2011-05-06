@@ -1,0 +1,3 @@
+[submodule "html/protovis"]
+	path = html/protovis
+	url = git://gitorious.org/protovis/protovis.git
