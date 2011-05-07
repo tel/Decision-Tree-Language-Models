@@ -10,6 +10,7 @@ import qualified Data.Foldable as F (sum)
 import Control.Monad (replicateM)
 import Control.Monad.State
 import Control.Arrow
+import GHC.Exts (the)
 
 import Stats
 import DTree
@@ -25,7 +26,7 @@ bsSingleton = Leaf . S.singleton
 -- unfoldClusterTree :: Ord a => Freq (a, a) -> [a] -> BTree a
 unfoldClusterTree freq2g vocab = 
     fmap (head . S.elems) $ 
-    head $ snd $ execState (replicateM (n-1) stepClustering) ((freq2g, freq1g), atoms)
+    the $ snd $ execState (replicateM (n-1) stepClustering) ((freq2g, freq1g), atoms)
     where n = length vocab
           freq1g = marginalize fst freq2g
           atoms  = map bsSingleton (nub vocab)
