@@ -19,8 +19,11 @@ data Freq a = Freq { totalCount :: Integer, counts :: M.Map a Integer }
 
 -- For any given container which can be folded over, produce a sample
 -- distribution of the objects it contains
+-- freqFrom :: (F.Foldable t, Ord a) => t a -> Freq a
+-- freqFrom cont = Freq n $ F.foldl' (flip $ M.alter (Just . maybe 1 (+1))) M.empty cont
+--     where n = F.foldl' (\a _ -> (a+1)) 0 cont
 freqFrom :: (F.Foldable t, Ord a) => t a -> Freq a
-freqFrom cont = Freq n $ F.foldl' (flip $ M.alter (Just . maybe 1 (+1))) M.empty cont
+freqFrom cont = Freq n $ F.foldl' (\map key -> M.insertWith (+) key 1 map) M.empty cont
     where n = F.foldl' (\a _ -> (a+1)) 0 cont
 
 -- Given a Freq, we should be able to poll it for frequencies and
