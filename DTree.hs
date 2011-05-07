@@ -4,10 +4,11 @@
   TypeSynonymInstances #-}
 module DTree 
     ( DTree(..), BTree, bBranch,
+      Dir(..),
       flatten, pathMap ) where
 
 -- Alright.
-import qualified Data.Foldable as F (Foldable, foldr, foldMap)
+import qualified Data.Foldable as F (Foldable, foldr, foldMap, maximum)
 import Data.Traversable (Traversable, traverse)
 import Data.Monoid (Monoid)
 import Control.Applicative ((<$>), (<*>))
@@ -79,10 +80,12 @@ instance Traversable (DTree s) where
 --
 -- Path functions
 
-data Dir = L | R deriving Show
+data Dir = L | R deriving (Eq, Show, Ord)
 type Path = [Dir]
 
 pathMap :: Ord a => DTree s a -> M.Map a Path
-pathMap tree = pathMap' tree []
+pathMap tree = normalize (pathMap' tree [])
     where pathMap' (Leaf x) path = M.singleton x (reverse path)
           pathMap' (Branch _ l r) path = (pathMap' l (L:path)) `M.union` (pathMap' r (R:path))
+          normalize m = let n = F.maximum $ M.map length m
+                        in M.map (\a -> a ++ replicate (n - length a) L) m
