@@ -12,7 +12,7 @@ import qualified Data.Map as M
 import qualified Data.IntMap as IM
 import Data.Maybe (fromMaybe)
 import Data.List (foldl')
-import Data.Char (ord, chr)
+import Data.Char (ord)
 
 -- The frequency data type encapsulates sample counts and frequencies
 data Freq a = Freq { totalCount :: Integer, counts :: M.Map a Integer }
