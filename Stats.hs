@@ -2,15 +2,17 @@ module Stats
     ( Freq(Freq, totalCount), 
       freqFrom, marginalize, imap,
       freqOf, countOf, 
-      log2, entropy) where
+      log2, entropy,
+      charFreqEntropy ) where
 
 import Foreign.C.Types
 import Control.Monad (liftM)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import qualified Data.IntMap as IM
 import Data.Maybe (fromMaybe)
 import Data.List (foldl')
-
+import Data.Char (ord, chr)
 
 -- The frequency data type encapsulates sample counts and frequencies
 data Freq a = Freq { totalCount :: Integer, counts :: M.Map a Integer }
@@ -43,6 +45,28 @@ entropy fr = log2 n - 1/n * 1/(F.sum $ fmap fn (counts fr))
   where n = fromIntegral $ totalCount fr
         fn :: Integer -> Double
         fn = ((\c -> c * (log2 c)) . fromIntegral)
+
+
+-- since computing the entropy of character distributions is common,
+-- here's an implementation which abuses ordinal mapping to speed up
+-- the computation (a lot!)
+charFreqEntropy :: [Char] -> Double
+charFreqEntropy chars = intMapEntropy (freqFromC ords)
+   where ords = map ord chars
+
+intMapEntropy :: (Integer, IM.IntMap Integer) -> Double
+intMapEntropy (n, fr) = log2 numn - 1/numn * 1/(F.sum $ fmap fn fr)
+  where numn = fromIntegral n
+        fn :: Integer -> Double
+        fn = ((\c -> c * (log2 c)) . fromIntegral)
+
+freqFromC :: [Int] -> (Integer, IM.IntMap Integer)
+freqFromC cont = (n, foldl' fn IM.empty cont)
+    where n = fromIntegral $ length cont
+          fn :: IM.IntMap Integer -> Int -> IM.IntMap Integer
+          fn map char = IM.insertWith (+) char 1 map
+                            
+-- (flip $ M.alter (Just . maybe 1 (+1)))
 
 -- compute a marginal frequency from a given frequency such that
 -- p2(b) = \sum_{a : a -> b} p1(a)
