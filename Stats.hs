@@ -1,5 +1,5 @@
 module Stats 
-    ( Freq(Freq, totalCount), 
+    ( Freq(Freq, totalCount, counts), 
       freqFrom, marginalize, imap,
       freqOf, countOf, 
       log2, entropy,
