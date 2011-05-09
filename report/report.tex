@@ -199,12 +199,11 @@ distributions corresponding to a complete partitioning of the trigram
 histories into 270 fine-grained equivalence classes.
 
 Various representations of the questions asked in the tree are shown
-in Figures \ref{fig:bs_wedges}, \ref{fig:bs_examplepaths},
-\ref{fig:bs_jumpcounts}. In particular, from Figure
-\ref{fig:bs_wedges} it is clear that the algorithm both,
-interestingly, clarifies the skip character first, but does not ask
-the maximum number of questions (9) of it before moving on to
-clarifying others. It also shows paths ranging between 5 and 10
+in Figures \ref{fig:bs_wedges} and \ref{fig:bs_examplepaths}. In
+particular, from Figure \ref{fig:bs_wedges} it is clear that the
+algorithm both, interestingly, clarifies the skip character first, but
+does not ask the maximum number of questions (9) of it before moving
+on to clarifying others. It also shows paths ranging between 5 and 10
 questions in length.
 
 Figure \ref{fig:bs_examplepaths} gives concrete examples of many
@@ -214,11 +213,11 @@ rapidly oscillate between clarifing two character simultaneously
 (oscillating paths). It also again serves to demonstrate the variation
 in path length in the tree.
 
-Figure \ref{fig:bs_jumpcounts} is a transition frequency matrix
-between various questions and demonstrates with its strong 1st
-superdiagonal that once a character is queried, it tends to be further
-clarified (especially $w3$, the word directly preceeding the predicted
-character).
+% Figure \ref{fig:bs_jumpcounts} is a transition frequency matrix
+% between various questions and demonstrates with its strong 1st
+% superdiagonal that once a character is queried, it tends to be further
+% clarified (especially $w3$, the word directly preceeding the predicted
+% character).
 
 While the decition tree here was trained on a text of 30k characters,
 a 5k letter test text was retained. Model perplexity was measured at
@@ -233,6 +232,7 @@ using that as the tree's prediction.
 
 \begin{figure}
   \centering
+  \vspace{-1in}
   \makebox[\textwidth]{\includegraphics[width=7.5in]{bs_wedges}}
   \caption{\textbf{A representation of the bitstring question grown
       decision tree for English spelling.} Here the root node is
@@ -263,17 +263,17 @@ using that as the tree's prediction.
   \label{fig:bs_examplepaths}
 \end{figure}
 
-\begin{figure}
-  \centering
-  \makebox[\textwidth]{\includegraphics[width=4in]{bs_jumpcounts}}
-  \caption{\textbf{Question pair frequencies in the experimental
-      decision tree.} Here the $x$ and $y$ axes represent indices into
-    the concatenated predictive bitstring (see Figure
-    \ref{fig:bs_examplepaths}) and the colored bins represent pairs of
-    questions such that the $x$-axis question was asked after the
-    $y$-axis question and darker colors are more frequently observed
-    pairs across all paths in the decision tree.}
-  \label{fig:bs_jumpcounts}
-\end{figure}
+% \begin{figure}
+%   \centering
+%   \makebox[\textwidth]{\includegraphics[width=4in]{bs_jumpcounts}}
+%   \caption{\textbf{Question pair frequencies in the experimental
+%       decision tree.} Here the $x$ and $y$ axes represent indices into
+%     the concatenated predictive bitstring (see Figure
+%     \ref{fig:bs_examplepaths}) and the colored bins represent pairs of
+%     questions such that the $x$-axis question was asked after the
+%     $y$-axis question and darker colors are more frequently observed
+%     pairs across all paths in the decision tree.}
+%   \label{fig:bs_jumpcounts}
+% \end{figure}
 
 \end{document}
