@@ -1,0 +1,57 @@
+<html>
+  <head>
+    <title>Circle Packing</title>
+    <script type="text/javascript" src="protovis/protovis-r3.3.js"></script>
+    <script type="text/javascript" src="dtree.js"></script>
+    <style type="text/css">
+
+      #fig {
+      width: 800px;
+      height: 800px;
+      }
+
+    </style>
+  </head>
+  <body><div id="center"><div id="fig">
+    <script type="text/javascript+protovis">
+
+/* For pretty number formatting. */
+var format = pv.Format.number();
+
+var vis = new pv.Panel()
+    .width(796)
+    .height(796)
+    .left(20)
+
+var tree = vis.add(pv.Layout.Cluster.Fill)
+    .nodes(pv.dom(dtree).nodes())
+    .orient("radial")
+
+col = function(d) {
+    if (d.firstChild.nodeValue[0] == '1') {
+	return "rgba(120, 170, 180, .65)"
+    } else if (d.firstChild.nodeValue[0] == '2') {
+	return "rgba(180, 120, 90, .45)"
+    } else {
+	return "rgba(100, 180, 120, .45)"
+    }
+}
+
+tree.node.add(pv.Wedge)
+    .visible(function(d) d.firstChild != null)
+    .lineWidth(1)
+    .shape("square")
+    .fillStyle(col)
+
+tree.label.add(pv.Label)
+    .text(function(d) d.firstChild ? d.firstChild.nodeValue : "")
+    .textAlign("center")
+    .textBaseline("middle")
+    .textAngle(pv.pi/4)
+    .font("8pt/8pt Arial")
+
+vis.render();
+
+    </script>
+  </div></div></body>
+</html>
