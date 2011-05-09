@@ -1,3 +1,11 @@
 *.hi
 *.o
 *.prof
+*.csv
+report/report.pdf
+report/*.aux
+report/*.dvi
+report/*.log
+Main
+.Rhistory
+.DS_Store
