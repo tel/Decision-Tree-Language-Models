@@ -177,3 +177,5 @@ growTree dat perc propose update seed0 splitScore stopScore continue =
                                 n        = na + nb
                                 (fa, fb) = (na/n, nb/n)
                             in fa*splitScore a + fb*splitScore b
+
+growTree80 dat = growTree dat 0.8
