@@ -8,7 +8,8 @@
 module DTree 
     ( DTree(..), BTree, bBranch,
       Dir(..),
-      flatten, pathMap ) where
+      flatten, pathMap,
+      Splitter(..), growTree ) where
 
 -- Alright.
 import qualified Data.Foldable as F (Foldable, foldr, foldMap, maximum)
@@ -137,7 +138,7 @@ instance Splitter [[Bool]] (Int, Int) where
 -- sample "goodness" score. Even the goodness comparison function is
 -- parameterized since the cutoff might be variable, though it's
 -- expected most will be of the form ((> n) . (-))
-growTree1 :: (Ord y, Eq y, Splitter x spl) => 
+growTree :: (Ord y, Eq y, Splitter x spl) => 
              [(y, x)]                   -- Observations, data `y` predicted by `x`
           -> Float                      -- Hold-out percentage
           -> (seed -> [spl])            -- Split proposal function
@@ -148,7 +149,7 @@ growTree1 :: (Ord y, Eq y, Splitter x spl) =>
           -> (Double -> Double -> Bool) -- "Goodness" comparator, 
                                         -- "old" -> "new" -> "continue growing?"
           -> DTree spl Double
-growTree1 dat perc propose update seed0 select score continue = 
+growTree dat perc propose update seed0 select score continue = 
     let (dev, ho) = splitAt (ceiling $ (fromIntegral $ length dat) * perc) dat
     in grow' dev ho seed0 (score $ map fst ho)
     where grow' dev ho seed goodness = 
