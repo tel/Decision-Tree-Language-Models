@@ -14,7 +14,8 @@ module DTree
 -- Alright.
 import qualified Data.Foldable as F (Foldable, foldr, foldMap, maximum)
 import qualified Data.Map as M
-import Data.List (partition)
+import Data.List (partition, minimumBy)
+import Data.Ord (comparing)
 import Data.Traversable (Traversable, traverse)
 import Data.Monoid (Monoid)
 import Control.Applicative ((<$>), (<*>))
@@ -105,10 +106,11 @@ pathMap tree = normalize (pathMap' tree [])
 -- splitting decision involves a split proposal step (based optionally
 -- on a spliter seed state which updates along paths in the growing
 -- tree), a split selection step (which is fully data driven and
--- ignorant of the actually split condition), and then a split
--- evaluation step (which is fully data driven off of held-out data)
--- which returns a "goodness" score of each split of the data set. If
--- the count-weighted average of these "goodnesses" doesn't beat the
+-- ignorant of the actually split condition; it only involves
+-- minimizing a score quantity), and then a split evaluation step
+-- (which is fully data driven off of held-out data) which returns a
+-- "goodness" score of each split of the data set. If the
+-- count-weighted average of these "goodnesses" doesn't beat the
 -- "goodness" of the node pre-split, it is considered terminal and
 -- recursion ends.
 --
@@ -144,14 +146,14 @@ growTree :: (Ord y, Eq y, Splitter x spl) =>
           -> (seed -> [spl])            -- Split proposal function
           -> (seed -> spl -> seed)      -- Seed update
           -> seed                       -- Initial seed
-          -> ([([y], [y])] -> Int)      -- Split selection function
+          -> ([y] -> Double)            -- Split selection function
           -> ([y] -> Double)            -- "Goodness" function
           -> (Double -> Double -> Bool) -- "Goodness" comparator, 
                                         -- "old" -> "new" -> "continue growing?"
           -> DTree spl Double
-growTree dat perc propose update seed0 select score continue = 
+growTree dat perc propose update seed0 splitScore stopScore continue = 
     let (dev, ho) = splitAt (ceiling $ (fromIntegral $ length dat) * perc) dat
-    in grow' dev ho seed0 (score $ map fst ho)
+    in grow' dev ho seed0 (stopScore $ map fst ho)
     where grow' dev ho seed goodness = 
               let splitters = propose seed
                   proposals = map (splitObs dev) splitters
@@ -163,10 +165,15 @@ growTree dat perc propose update seed0 select score continue =
                   (nl, nr)  = (fromIntegral $ length hol, fromIntegral $ length hor)
                   n         = nl + nr
                   (fl, fr)  = (nl/n, nr/n)
-                  goodnessl = score (map fst hol)
-                  goodnessr = score (map fst hor)
+                  goodnessl = stopScore (map fst hol)
+                  goodnessr = stopScore (map fst hor)
                   goodness' = fl*goodnessl + fr*goodnessr
               in if continue goodness goodness'
                  then Branch bestSpl (grow' devl hol seed' goodnessl)
                                      (grow' devr hor seed' goodnessr)
                  else Leaf goodness'
+          select splits = minimumBy (comparing (scoreMe . (splits !!))) [0..(length splits - 1)]
+          scoreMe (a, b)  = let (na, nb) = (fromIntegral $ length a, fromIntegral $ length b)
+                                n        = na + nb
+                                (fa, fb) = (na/n, nb/n)
+                            in fa*splitScore a + fb*splitScore b
