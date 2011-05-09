@@ -3,7 +3,7 @@ module Stats
       freqFrom, marginalize, imap,
       freqOf, countOf, 
       log2, entropy,
-      charFreqEntropy ) where
+      charFreqEntropy, freqFromC ) where
 
 import Foreign.C.Types
 import Control.Monad (liftM)
