@@ -9,6 +9,8 @@ import Data.Ord (comparing)
 import Data.Maybe (fromMaybe, fromJust)
 import qualified Data.Map as M
 import Data.List (minimumBy, maximumBy, zip4)
+import Data.Char (ord)
+import qualified Data.IntMap as IM
 
 import Agglomeration
 import Text
@@ -36,10 +38,12 @@ reductionThreshold = 0.005
 --      -> DTree (Int, Int) Double
 splitNode (dev, ho) (hdev, hho) (qs1, qs2, qs3) = 
     if hho - hho' > reductionThreshold
-    then Branch bestQ (splitNode (devl, hol) (hdev', hho') qlst)
-                      (splitNode (devr, hor) (hdev', hho') qlst)
-    else Leaf ()
+    then Branch (bestQ, freq) (splitNode (devl, hol) (hdev', hho') qlst)
+                              (splitNode (devr, hor) (hdev', hho') qlst)
+    else Leaf freq
     where
+      freq  = freqFromC $ map (ord . fst) all
+      all   = ho ++ dev
       hho'  = splitEntropy ho bestQ
       hdev' = splitEntropy dev bestQ
       (devl, devr) = splitByQ bestQ dev
@@ -101,26 +105,61 @@ train2g = bigrams train
 obs = fromJust $ makeObs tree1 train
 tr = buildTree 0.8 obs
 
+test = unsafePerformIO (readFile "textB.txt")
+test2g = bigrams test
+obs_test = fromJust $ makeObs tree1 test
+
 printDTree :: Show a => DTree (Int, Int) a -> String
-printDTree (Branch s l r) = "'" ++ show s ++ "': {" ++ printDTree l ++ ", " ++ printDTree r ++ "}"
-printDTree (Leaf a) = "leaf: " ++ show a
+printDTree (Leaf _) = "()"
+printDTree tr = "var dtree = " ++ printDTree' tr
+    where
+      printDTree' (Leaf _) = "1"
+      printDTree' (Branch q (Leaf _) (Leaf _)) = 
+          "{name: '" ++ showq q ++ "'}"
+      printDTree' (Branch q l (Leaf _)) = 
+          "{name: '" ++ showq q ++ "', left: " ++ printDTree' l ++ "}"
+      printDTree' (Branch q (Leaf _) r) = 
+          "{name: '" ++ showq  q ++ "', right: " ++ printDTree' r ++ "}"
+      printDTree' (Branch q l r) = 
+          "{name: '" ++ showq q ++ "', left: " ++ printDTree' l ++ 
+                         ", right: " ++ printDTree' r ++ "}"
+      showq (i, j) = show (i+1) ++ ":" ++ show j
 
-mapQlists :: DTree (Int, Int) a -> [[(Int, Int)]]
-mapQlists tr = fn tr []
-    where fn (Leaf _) qlst = [reverse qlst]
-          fn (Branch s l r) qlist = let qlist1 = s:qlist in fn l qlist1 ++ fn r qlist1
+-- mapQlists :: DTree (Int, Int) a -> [[(Int, Int)]]
+-- mapQlists tr = fn tr []
+--     where fn (Leaf _) qlst = [reverse qlst]
+--           fn (Branch s l r) qlist = let qlist1 = s:qlist in fn l qlist1 ++ fn r qlist1
 
-qlists = zipWith3 (\a b c -> show a ++ ", " ++ show b ++ ", " ++ show c) (concat qs) ids ts
-    where qs = map (map (\(a,b) -> 9*a + b)) $ mapQlists tr
-          ids = concat . zipWith ($) (map (replicate . length) qs) $ [1..270]
-          ts = concat $ map (\a -> [1..(length a)]) qs
+-- qlists = zipWith3 (\a b c -> show a ++ ", " ++ show b ++ ", " ++ show c) (concat qs) ids ts
+--     where qs = map (map (\(a,b) -> 9*a + b)) $ mapQlists tr
+--           ids = concat . zipWith ($) (map (replicate . length) qs) $ [1..270]
+--           ts = concat $ map (\a -> [1..(length a)]) qs
 
-qlists2 = map (\idx -> fromMaybe 0 $ M.lookup idx jumpC) (range ((0, 0), (26, 26)))
-    where qs = map (map (\(a,b) -> 9*a + b)) $ mapQlists tr
-          jumpC = counts $ freqFrom $ concat $ map (\lst -> zip lst (tail lst)) qs
+-- qlists2 = map (\idx -> fromMaybe 0 $ M.lookup idx jumpC) (range ((0, 0), (26, 26)))
+--     where qs = map (map (\(a,b) -> 9*a + b)) $ mapQlists tr
+--           jumpC = counts $ freqFrom $ concat $ map (\lst -> zip lst (tail lst)) qs
+
+lik :: DTree ((Int, Int), (Integer, IM.IntMap Integer)) (Integer, IM.IntMap Integer)
+       -> Obs
+       -> Double
+lik tree (c, pred) = lik' tree (log2 0)
+    where lik' (Branch (q, (n, countmap)) l r) prev = 
+              case IM.lookup (ord c) countmap of
+                Nothing -> prev 
+                Just ct -> let logprob = log2 $ (fromIntegral ct)/(fromIntegral n)
+                           in case pred ! q of
+                                L -> lik' l logprob
+                                R -> lik' r logprob
+          lik' (Leaf (n, countmap)) prev =
+              case IM.lookup (ord c) countmap of
+                Nothing -> prev
+                Just ct -> log2 $ (fromIntegral ct)/(fromIntegral n)
+
+
 main = do train <- readFile "textA.txt"
           let train2g   = bigrams train
               bg        = freqFrom train2g
               alpha     = "abcdefghijklmnopqrstuvwxyz "
               obs       = fromJust $ makeObs tree1 train
-          writeFile "jump_counts.csv" (unlines $ map show qlists2)
+              ntest     = fromIntegral $ length test
+          print $ 2**(-(sum $ map (lik tr) obs_test)/ntest)
