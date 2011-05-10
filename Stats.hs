@@ -1,87 +1,83 @@
+{-# Language
+  MultiParamTypeClasses,
+  FunctionalDependencies,
+  FlexibleInstances,
+  OverlappingInstances
+  #-}
+
 module Stats 
-    ( Freq(Freq, totalCount, counts), 
-      freqFrom, marginalize, imap,
-      freqOf, countOf, 
-      log2, entropy,
-      charFreqEntropy, freqFromC ) where
+    ( Freq, 
+      freqFrom, domain, freqOf, entropy, gini,
+      log2 ) where
 
 import Foreign.C.Types
 import Control.Monad (liftM)
 import qualified Data.Foldable as F
+import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
 import Data.Maybe (fromMaybe)
 import Data.List (foldl')
-import Data.Char (ord)
-
--- The frequency data type encapsulates sample counts and frequencies
-data Freq a = Freq { totalCount :: Integer, counts :: M.Map a Integer }
-
--- For any given container which can be folded over, produce a sample
--- distribution of the objects it contains
--- freqFrom :: (F.Foldable t, Ord a) => t a -> Freq a
--- freqFrom cont = Freq n $ F.foldl' (flip $ M.alter (Just . maybe 1 (+1))) M.empty cont
---     where n = F.foldl' (\a _ -> (a+1)) 0 cont
-freqFrom :: (F.Foldable t, Ord a) => t a -> Freq a
-freqFrom cont = Freq n $ F.foldl' (\map key -> M.insertWith (+) key 1 map) M.empty cont
-    where n = F.foldl' (\a _ -> (a+1)) 0 cont
-
--- Given a Freq, we should be able to poll it for frequencies and
--- counts. These are supposed to mimic the interface of M.lookup,
--- although for unknown keys they default to 0. Sensible!
-countOf :: Ord a => a -> Freq a -> Integer
-freqOf :: Ord a => a -> Freq a -> Double
-
-countOf o fr = fromMaybe 0 (M.lookup o (counts fr))
-freqOf  o fr = (fromIntegral $ countOf o fr) / (fromIntegral $ totalCount fr)
+import Data.Char (ord, chr)
 
 
--- A real log2 implementation so that we can deal in bits
+-- Firstly, a real log2 implementation so that we can deal in bits
 foreign import ccall unsafe "math.h log2"
   c_log2 :: CDouble -> CDouble
 log2 :: Double -> Double
 log2 x = realToFrac (c_log2 (realToFrac x))
 
--- and an entropy defined over `Freq`s
-entropy :: Freq o -> Double
-entropy fr = log2 n - 1/n * 1/(F.sum $ fmap fn (counts fr))
-  where n = fromIntegral $ totalCount fr
-        fn :: Integer -> Double
-        fn = ((\c -> c * (log2 c)) . fromIntegral)
+-- The frequency class encapsulates types that map over data spaces
+-- and return measure 1 reals.
+class Freq f a | a -> f where
+    freqFrom :: [a] -> f a
+    domain   :: f a -> [a]
+    freqOf   :: a -> f a -> Double
+    entropy  :: f a -> Double
+    gini     :: f a -> Double
 
+    -- Default entropy implementation
+    entropy fr = -sum (map surprise (domain fr))
+        where surprise x = let c = freqOf x fr
+                           in c * (log2 c)
 
--- since computing the entropy of character distributions is common,
--- here's an implementation which abuses ordinal mapping to speed up
--- the computation (a lot!)
-charFreqEntropy :: [Char] -> Double
-charFreqEntropy chars = intMapEntropy (freqFromC ords)
-   where ords = map ord chars
+    -- Default gini index
+    gini fr = 1 - sum (map sqprob (domain fr))
+        where sqprob x = let c = freqOf x fr
+                         in c**2
 
-intMapEntropy :: (Integer, IM.IntMap Integer) -> Double
-intMapEntropy (n, fr) = log2 numn - 1/numn * 1/(F.sum $ fmap fn fr)
-  where numn = fromIntegral n
-        fn :: Integer -> Double
-        fn = ((\c -> c * (log2 c)) . fromIntegral)
-
-freqFromC :: [Int] -> (Integer, IM.IntMap Integer)
-freqFromC cont = (n, foldl' fn IM.empty cont)
-    where n = fromIntegral $ length cont
-          fn :: IM.IntMap Integer -> Int -> IM.IntMap Integer
-          fn map char = IM.insertWith (+) char 1 map
-                            
--- (flip $ M.alter (Just . maybe 1 (+1)))
-
--- compute a marginal frequency from a given frequency such that
--- p2(b) = \sum_{a : a -> b} p1(a)
--- use with (fst) and (snd) to get the usual marginals
+-- A general Data.Map instance of Freq. If we don't override this on a
+-- particular type, it'll act as a fall-back. Unfortunately, general
+-- map lookups and alters are SLOW.
 --
--- Technically note that this definition is sufficient to enter Freq
--- into the Functor typeclass so long as the underlying type a is
--- Ord. Since Haskell doesn't allow that directly we'll just also
--- define item map, imap
-marginalize :: Ord b => (a -> b) -> Freq a -> Freq b
-marginalize group (Freq n cts) = Freq n $ F.foldl' fn M.empty (M.toList cts)
-        where fn map (k, v) = M.alter (Just . fromMaybe v . liftM (+v)) (group k) map
+-- In order to avoid overlapping instances, there's a toolkit for
+-- building new instances generically.
+data FreqMap a = FreqMap (M.Map a Double)
+genericFreqFrom os = 
+    FreqMap (foldl' (\map key -> M.insertWith (+) key quanta map) M.empty os)
+        where quanta = (1 :: Double)/(fromIntegral $ length os)
+genericDomain (FreqMap map) = M.keys map
+genericFreqOf o (FreqMap map) = fromMaybe 0 $ M.lookup o map
 
-imap :: Ord b => (a -> b) -> Freq a -> Freq b
-imap = marginalize
+-- For instance, in order to chart sets of objects
+instance Ord a => Freq FreqMap (S.Set a) where
+    freqFrom = genericFreqFrom
+    domain = genericDomain
+    freqOf = genericFreqOf
+
+-- A more specific mapping so long as we're looking for entropies over
+-- characters. The a is a phantom parameter.
+--
+data CountMap a = CountMap {toIntFn :: a -> IM.Key, 
+                            fromKeyFn :: IM.Key -> a,
+                            totalCount :: Int, 
+                            counts :: IM.IntMap Integer}
+
+instance Freq CountMap Char where
+    freqFrom cs = CountMap ord chr n $ foldl' fn IM.empty (map ord cs)
+        where n = fromIntegral $ length cs
+              fn map i = IM.insertWith (+) i 1 map
+    domain cm = map (fromKeyFn cm) $ IM.keys (counts cm)
+    freqOf o cm = numer/denom
+        where numer = fromIntegral $ fromMaybe 0 (IM.lookup (ord o) (counts cm))
+              denom = fromIntegral $ totalCount cm
