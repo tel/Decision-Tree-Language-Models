@@ -6,9 +6,9 @@
   #-}
 
 module Stats 
-    ( Freq, 
+    ( Freq, FreqMap(..), CountMap(..),
       freqFrom, domain, freqOf, entropy, gini,
-      log2 ) where
+      log2, lgamma2, lbeta2, lchoose2, betabinom ) where
 
 import Foreign.C.Types
 import Control.Monad (liftM)
@@ -26,6 +26,22 @@ foreign import ccall unsafe "math.h log2"
   c_log2 :: CDouble -> CDouble
 log2 :: Double -> Double
 log2 x = realToFrac (c_log2 (realToFrac x))
+
+-- And a log2 . gamma function and the corresponding beta
+foreign import ccall unsafe "math.h lgamma"
+  c_lgamma :: CDouble -> CDouble
+lgamma2 :: Double -> Double
+lgamma2 x = realToFrac (c_lgamma (realToFrac x)) / (log 2)
+
+-- Log binomial coefficient and log beta
+lchoose2 x y = lgamma2 (x + 1) - lgamma2 (y + 1) - lgamma2 (x - y + 1)
+lbeta2 a b = lgamma2 a + lgamma2 b - lgamma2 (a + b)
+
+-- Now we can get beta-binomial distributions
+betabinom a b len = map bb [0..m]
+    where m     = len - 1
+          bb    = (2**) . bb'
+          bb' n = m `lchoose2` n + lbeta2 (a + n) (b + m - n) - lbeta2 a b
 
 -- The frequency class encapsulates types that map over data spaces
 -- and return measure 1 reals.
