@@ -1,0 +1,62 @@
+<html>
+  <head>
+    <title>Circle Packing</title>
+    <script type="text/javascript" src="protovis/protovis-r3.3.js"></script>
+    <script type="text/javascript" src="lik.js"></script>
+    <style type="text/css">
+
+      #fig {
+	  width: 800px;
+	  height: 600px;
+	  margin: 0 auto;
+      }
+
+    </style>
+  </head>
+  <body><div id="center"><div id="fig">
+    <script type="text/javascript+protovis">
+
+/* For pretty number formatting. */
+var format = pv.Format.number();
+
+var w=800
+var h=540
+var y = pv.Scale.linear(0, -10).range(h, 0)
+var x = pv.Scale.linear(0, lik.length).range(0, w)
+
+var vis = new pv.Panel()
+    .width(w)
+    .height(h)
+    .margin(30)
+
+vis.add(pv.Rule)
+    .data(y.ticks(20))
+    .bottom(y)
+    .strokeStyle(function(d) d ? "#eee" : "#000")
+    .anchor("left").add(pv.Label)
+    .text(y.tickFormat);
+
+vis.add(pv.Dot)
+    .data(lik)
+    .left(function(d) x(this.index))
+    .bottom(function(d) y(d))
+    .lineWidth(0.5)
+    .shapeRadius(1)
+
+mean_lik = pv.mean(lik);
+mean_lik = [{y: y(mean_lik), x: 0}, 
+	    {y: y(mean_lik), x: w}];
+
+vis.add(pv.Line)
+    .data(mean_lik)
+    .strokeStyle(function(d) "rgba(240, 70, 20, 0.8)")
+    .left(function(d) d.x)
+    .bottom(function(d) d.y)
+    .lineWidth(2)
+
+
+vis.render();
+
+    </script>
+  </div></div></body>
+</html>

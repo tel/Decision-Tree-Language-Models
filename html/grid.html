@@ -1,0 +1,61 @@
+<html>
+  <head>
+    <title>Circle Packing</title>
+    <script type="text/javascript" src="protovis/protovis-r3.3.js"></script>
+    <script type="text/javascript" src="grid.js"></script>
+    <style type="text/css">
+
+      #fig {
+	  width: 500px;
+	  height: 500px;
+	  margin: 0 auto;
+	  margin-top: 50px;
+      }
+
+    </style>
+  </head>
+  <body><div id="center"><div id="fig">
+    <script type="text/javascript+protovis">
+
+/* For pretty number formatting. */
+var format = pv.Format.number();
+
+var w=540
+var h=540
+var y = pv.Scale.linear(grid, function (d) d.y).range(0, h)
+var x = pv.Scale.linear(grid, function (d) d.x).range(0, w)
+var v = pv.Scale.linear(grid, function (d) d.v)
+    .range("#000", "#fff")
+
+var vis = new pv.Panel()
+    .width(w)
+    .height(h)
+
+vis.add(pv.Rule)
+    .data(y.ticks(20))
+    .left(y)
+    .strokeStyle("#eee")
+    .anchor("left").add(pv.Label)
+    .text(y.tickFormat);
+
+vis.add(pv.Rule)
+    .data(x.ticks(20))
+    .bottom(x)
+    .strokeStyle("#eee")
+    .anchor("bottom").add(pv.Label)
+    .text(x.tickFormat);
+
+vis.add(pv.Bar)
+    .data(grid)
+    .left(function(d) x(d.x))
+    .bottom(function(d) y(d.y))
+    .fillStyle(function(d) v(d.v))
+    .lineWidth(0)
+    .width(x(2))
+    .height(y(2))
+
+vis.render();
+
+    </script>
+  </div></div></body>
+</html>
