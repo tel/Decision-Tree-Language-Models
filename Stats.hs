@@ -65,6 +65,11 @@ instance Ord a => Freq FreqMap (S.Set a) where
     domain = genericDomain
     freqOf = genericFreqOf
 
+instance Ord a => Freq FreqMap (a, a) where
+    freqFrom = genericFreqFrom
+    domain = genericDomain
+    freqOf = genericFreqOf
+
 -- A more specific mapping so long as we're looking for entropies over
 -- characters. The a is a phantom parameter.
 --

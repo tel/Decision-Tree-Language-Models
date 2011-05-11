@@ -17,22 +17,23 @@ import DTree
 
 -- some types for agglomeration
 type BSTree a = BTree (S.Set a)
-type FreqSt a = (Freq (a, a), Freq a)
+type FreqSt = (FreqMap (Char, Char), CountMap Char)
 bsSingleton = Leaf . S.singleton
 
 -- iteratively cluster a group of atoms such that at each step the
 -- merged atoms (sets of atoms) are the ones with maximal mutual
 -- information
 -- unfoldClusterTree :: Ord a => Freq (a, a) -> [a] -> BTree a
-unfoldClusterTree freq2g vocab = 
+unfoldClusterTree
+  :: CountMap Char -> FreqMap (Char, Char) -> [Char] -> DTree () Char
+unfoldClusterTree freq1g freq2g vocab = 
     fmap (head . S.elems) $ 
     the $ snd $ execState (replicateM (n-1) stepClustering) ((freq2g, freq1g), atoms)
     where n = length vocab
-          freq1g = marginalize fst freq2g
           atoms  = map bsSingleton (nub vocab)
 
 -- perform a single cluster update step
-stepClustering :: (Ord a, Eq a) => State (FreqSt a, [BSTree a]) ()
+stepClustering :: State (FreqSt, [BSTree Char]) ()
 stepClustering = do
   ((bg, ug), trees) <- get
   let n = length trees
@@ -50,7 +51,7 @@ stepClustering = do
 -- Compute the mutual information over groupings based on the bigram
 -- and unigram class frequencies
 mutualInfo
-  :: Ord a => Freq (a, a) -> Freq a -> [DTree s (S.Set a)] -> Double
+  :: FreqMap (Char, Char) -> CountMap Char -> [DTree s (S.Set Char)] -> Double
 mutualInfo bg ug trees = sum $ filter (not . isNaN) $ map mi is
     where n  = length trees
           is = [(i, j) | i <- [0..(n-1)], j <- [0..(n-1)]]
