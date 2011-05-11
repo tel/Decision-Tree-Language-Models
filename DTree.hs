@@ -9,7 +9,8 @@ module DTree
     ( DTree(..), BTree, bBranch,
       Dir(..),
       flatten, pathMap,
-      Splitter(..), growTree ) where
+      Splitter(..), growTree, growTree80,
+      freqDTree, loglik, perplexity) where
 
 -- Alright.
 import qualified Data.Foldable as F (Foldable, foldr, foldMap, maximum)
@@ -22,6 +23,8 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad (liftM)
 import Text.Read (lift, readPrec)
 import Text.ParserCombinators.ReadP
+
+import Stats
 
 -- The general decision tree type. It's particularly important to note
 -- that types can be stored at both branch and leaf nodes (important
@@ -156,26 +159,69 @@ growTree dat perc propose update seed0 splitScore stopScore continue =
     in grow' dev ho seed0 (stopScore $ map fst ho)
     where grow' dev ho seed goodness = 
               let splitters = propose seed
-                  proposals = map (splitObs dev) splitters
-                  bestIdx   = select proposals
-                  bestSpl   = splitters !! bestIdx
+                  bestSpl   = select splitters dev
                   seed'     = update seed bestSpl
                   (devl, devr) = partition (sfilter bestSpl . snd) dev
                   (hol, hor)   = partition (sfilter bestSpl . snd) ho
                   (nl, nr)  = (fromIntegral $ length hol, fromIntegral $ length hor)
                   n         = nl + nr
-                  (fl, fr)  = (nl/n, nr/n)
                   goodnessl = stopScore (map fst hol)
                   goodnessr = stopScore (map fst hor)
-                  goodness' = fl*goodnessl + fr*goodnessr
+                  goodness' = (nl/n)*goodnessl + (nr/n)*goodnessr
               in if continue goodness goodness'
                  then Branch bestSpl (grow' devl hol seed' goodnessl)
                                      (grow' devr hor seed' goodnessr)
                  else Leaf goodness'
-          select splits = minimumBy (comparing (scoreMe . (splits !!))) [0..(length splits - 1)]
+          select splitters dat = fst $ minimumBy (comparing snd) $ 
+                                 zip splitters (map (scoreMe . splitObs dat) splitters)
           scoreMe (a, b)  = let (na, nb) = (fromIntegral $ length a, fromIntegral $ length b)
                                 n        = na + nb
-                                (fa, fb) = (na/n, nb/n)
-                            in fa*splitScore a + fb*splitScore b
+                            in (na/n)*(splitScore a) + (nb/n)*(splitScore b)
 
 growTree80 dat = growTree dat 0.8
+
+
+-- Tree prediction
+--
+-- Decision trees are only useful if they can be used to predict the
+-- observations that built them. To do this, we can take a
+-- questionfull decision tree and augment it with frequencies computed
+-- from another compatible data set.
+freqDTree :: (Splitter pred spl, Freq f y) => 
+             DTree spl a -> [(y, pred)] -> DTree (spl, f y) (f y)
+freqDTree (Branch spl l r) dat = Branch 
+                                 (spl, freqFrom $ map fst dat)
+                                 (freqDTree l datl)
+                                 (freqDTree r datr)
+    where (datl, datr) = partition (sfilter spl . snd) dat
+freqDTree (Leaf _) dat = Leaf $ freqFrom $ map fst dat
+
+
+loglik :: (Splitter pred spl, Freq f y, Eq y) =>
+       DTree (spl, f y) (f y)
+    -> (Double, Double)
+    -> [(y, pred)]
+    -> [Double]
+loglik tree (a, b) dat = map (log2 . (lik tree [])) dat
+    where lik (Branch (spl, fr) l r) prev obs = 
+              if elem (fst obs) (domain fr)
+              then let pr = freqOf (fst obs) fr
+                   in if sfilter spl (snd obs) 
+                      then lik l (pr:prev) obs -- send it left
+                      else lik r (pr:prev) obs -- send it right
+              else doPrev prev
+          lik (Leaf fr) prev obs =
+              if elem (fst obs) (domain fr)
+              then let pr = freqOf (fst obs) fr
+                   in doPrev (pr:prev)
+              else doPrev prev
+          normalize wts = map (/sum wts) wts
+          doPrev prev = sum $ zipWith (*) (betabinom a b (fromIntegral $ length prev)) prev
+
+perplexity :: (Splitter pred spl, Freq f y, Eq y) =>
+              DTree (spl, f y) (f y)
+           -> (Double, Double)
+           -> [(y, pred)]
+           -> Double 
+perplexity tree betaparams dat = 
+    2 ** (- 1/(fromIntegral $ length dat) * (sum $ loglik tree betaparams dat))
