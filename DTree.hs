@@ -144,15 +144,15 @@ instance Splitter [[Bool]] (Int, Int) where
 -- parameterized since the cutoff might be variable, though it's
 -- expected most will be of the form ((> n) . (-))
 growTree :: (Ord y, Eq y, Splitter x spl) => 
-             [(y, x)]                   -- Observations, data `y` predicted by `x`
-          -> Float                      -- Hold-out percentage
-          -> (seed -> [spl])            -- Split proposal function
-          -> (seed -> spl -> seed)      -- Seed update
-          -> seed                       -- Initial seed
-          -> ([y] -> Double)            -- Split selection function
-          -> ([y] -> Double)            -- "Goodness" function
-          -> (Double -> Double -> Bool) -- "Goodness" comparator, 
-                                        -- "old" -> "new" -> "continue growing?"
+             [(y, x)]                     -- Observations, data `y` predicted by `x`
+          -> Float                        -- Hold-out percentage
+          -> (seed -> [spl])              -- Split proposal function
+          -> (seed -> spl -> Dir -> seed) -- Seed update
+          -> seed                         -- Initial seed
+          -> ([y] -> Double)              -- Split selection function
+          -> ([y] -> Double)              -- "Goodness" function
+          -> (Double -> Double -> Bool)   -- "Goodness" comparator, 
+                                          -- "old" -> "new" -> "continue growing?"
           -> DTree spl Double
 growTree dat perc propose update seed0 splitScore stopScore continue = 
     let (dev, ho) = splitAt (ceiling $ (fromIntegral $ length dat) * perc) dat
@@ -160,7 +160,7 @@ growTree dat perc propose update seed0 splitScore stopScore continue =
     where grow' dev ho seed goodness = 
               let splitters = propose seed
                   bestSpl   = select splitters dev
-                  seed'     = update seed bestSpl
+                  seedOf    = update seed bestSpl 
                   (devl, devr) = partition (sfilter bestSpl . snd) dev
                   (hol, hor)   = partition (sfilter bestSpl . snd) ho
                   (nl, nr)  = (fromIntegral $ length hol, fromIntegral $ length hor)
@@ -169,8 +169,8 @@ growTree dat perc propose update seed0 splitScore stopScore continue =
                   goodnessr = stopScore (map fst hor)
                   goodness' = (nl/n)*goodnessl + (nr/n)*goodnessr
               in if continue goodness goodness'
-                 then Branch bestSpl (grow' devl hol seed' goodnessl)
-                                     (grow' devr hor seed' goodnessr)
+                 then Branch bestSpl (grow' devl hol (seedOf L) goodnessl)
+                                     (grow' devr hor (seedOf R) goodnessr)
                  else Leaf goodness'
           select splitters dat = fst $ minimumBy (comparing snd) $ 
                                  zip splitters (map (scoreMe . splitObs dat) splitters)

@@ -42,13 +42,13 @@ defaultSeed n = map (\i -> zip (repeat i) [0..]) [0..(n-1)]
 -- Updating the seed just involves chopping the head off of whatever
 -- index was chosen. Since they're already indexed by the `i` index in
 -- the question itself, this is easy.
-updateSeed seed (i, j) = let (front, key:back) = splitAt (i-1) seed
-                         in front ++ (tail key):back
+updateSeed seed (i, j) _ = let (front, key:back) = splitAt (i-1) seed
+                           in front ++ (tail key):back
 
 -- And now we've got enough to parametrize the whole tree!
 growBSModel :: [(Char, Pred)] -> DTree (Int, Int) Double
 growBSModel obs = growTree
-                  obs 0.5
+                  obs 0.8
                   (map head) 
                   updateSeed 
                   (defaultSeed 3)
