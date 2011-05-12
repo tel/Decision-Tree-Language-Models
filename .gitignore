@@ -8,6 +8,7 @@ report/*.dvi
 report/*.log
 Main
 BSModel
+ChouModel
 .Rhistory
 .DS_Store
 html/*.js
