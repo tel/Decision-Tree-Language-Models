@@ -227,7 +227,22 @@ Beta-Binomial distribution
 \end{align}
 
 with $\Gamma(x) \triangleq \int_0^\infty t^{x-1} e^{-t} dt$ being the
-Gamma function extension of factorial. 
+Gamma function extension of factorial. While this choice of weight
+distribution is completely arbitrary, it does cover any interpolation
+which can be described entirely by unbounded weighting of the unigram
+and leaf node models along each path. Included in this set is any
+``monomodal'' interpolation for which a certain range along the path
+is favored along with the ``tail-weighted'' interpolation where only
+the unigram and leaf-node models are considered and they are weighted
+equally (see Figure \ref{fig:betabinomial}).
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth]{betabinom}
+  \caption{\textbf{Beta-binomial distributions for various choices of
+      parameters $(\alpha, \beta)$.}}
+  \label{fig:betabinomial}
+\end{figure}
 
 This method of smoothing has the distinct disadvantage of having no
 clear Baum algorithm update method (though one may be possible to
