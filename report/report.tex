@@ -127,7 +127,7 @@ particular atom. Such bitstrings can be encoded such as
 $\langle$LLRLRRLRR$\rangle$ and unambiguously select a particular
 atom. Moreover, any left substring of a predictor of this form will
 denote the subset of $\mathcal{A}$ that both contains $a$ and has the
-maximual mutual information with $a$. In this way we can guarantee
+maximal mutual information with $a$. In this way we can guarantee
 that if an actor interested in predicting $a$ knew some left substring
 of $a$'s bitstring encoding, the best next question for that actor to
 ask would be the leftmost unseen ``bit'' in the string.
@@ -203,15 +203,15 @@ The suggested linear smoothing method, proposed in Jelinek [1997], is
 flawed in that in practice it ties smoothing weights in such a way
 that some leaf distributions become unnormalized. This occurs because
 the path lengths through the trees are not guaranteed to be identical
-and such leanred parameters tied to tree depth will only sum to 1 for
+and such learned parameters tied to tree depth will only sum to 1 for
 maximally long paths in the tree.
 
 To remedy this, one can use an adaptive smoothing method which
 generates smoothing parameters conditional on the path through the
-tree. For convenience and coherance across the tree, we demand that
+tree. For convenience and coherence across the tree, we demand that
 each adaptive process returns similar results for any path, and for
 purposes of training we demand that it has some kind of global
-parametrization which does not depend on the path. This constraints
+parameterization which does not depend on the path. This constraints
 together suggest that the parameters of each adaptive process can be
 tied and trained simultaneously.
 
@@ -284,10 +284,10 @@ $w_2$.
 % Figure \ref{fig:bs_jumpcounts} is a transition frequency matrix
 % between various questions and demonstrates with its strong 1st
 % superdiagonal that once a character is queried, it tends to be further
-% clarified (especially $w3$, the word directly preceeding the predicted
+% clarified (especially $w3$, the word directly preceding the predicted
 % character).
 
-While the decition tree here was trained on a text of 25k characters,
+While the decision tree here was trained on a text of 25k characters,
 with a 5k letter smoothing verification text, and a 5k test text
 retained. Model perplexity was measured at 8.31 on this test text
 which represents an improvement of 8.73 over the unigram
@@ -387,9 +387,9 @@ method as described for the bitstream encoded tree is used here.
 
 A decision tree was formed by the Chou model using an identical
 training and testing data set as the bitstring model. Considering the
-abovementioned $\mathcal{A}_0$ sensitivity, three choices of
+above-mentioned $\mathcal{A}_0$ sensitivity, three choices of
 $\mathcal{A}_0$ were used \begin{inparaenum} 
-\item the agglomerative model's first split: vowels and consontents
+\item the agglomerative model's first split: vowels and consonants
 \item an uninformative split taking every other letter in alphabet
   order ($\mathcal{A}_0$ = \texttt{"acegikmoqsuwy "})
 \item a maximum entropy choice found by searching once over all 137
@@ -413,7 +413,7 @@ trees. Moreover, while the ``Alternating'' style $\mathcal{A}_0$
 choice was rather arbitrary, it performs similarly to the maximal
 entropy choice. Both of those, however, out perform the
 vowel+consonant split $\mathcal{A}_0$ suggesting that such an informed
-choice of $\mathcal{A}_0$ leads to an underexplored search space as
+choice of $\mathcal{A}_0$ leads to an under-explored search space as
 the Chou algorithm can quickly get stuck in local optima near that
 solution.
 
