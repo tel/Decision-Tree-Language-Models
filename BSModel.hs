@@ -10,6 +10,8 @@ module Main where
 import Data.Array (Array(..), (!), listArray, bounds, assocs)
 import Data.Ix (inRange, range)
 import qualified Data.Map as M (lookup, toList)
+import Data.Foldable (foldMap)
+import Data.Monoid (Sum(..))
 import Data.List (zip3, zip4)
 import Data.Maybe (fromJust)
 
@@ -112,6 +114,8 @@ main = do
   let betaparams = (1, 10000000)
   putStrLn $ "Test:  " ++ (show $ perplexity ftr betaparams test_obs)
   putStrLn $ "Train: " ++ (show $ perplexity ftr betaparams train_obs)
+  -- Count the leaf nodes
+  putStrLn $ show $ foldMap (const (Sum 1)) tr
   -- Store some output files for analysis and presentation
   writeFile "html/dtree.js" $ dTreeJSON tr showBSQ
   writeFile "html/lik.js" $ "var lik = [" ++

@@ -10,11 +10,16 @@ module Main where
 import System.IO.Unsafe (unsafePerformIO)
 
 import qualified Data.IntMap as IM
-import Data.List (partition, foldl', nub, sortBy)
+import qualified Data.Map as M
+import Data.List (partition, foldl', nub, sortBy, zipWith4, maximumBy)
 import Data.Ord (comparing)
-import Data.Char (ord, chr)
+import Data.Char (ord, chr, intToDigit)
 import Data.Maybe (fromMaybe)
-import Data.Array (Array, accumArray, (!))
+import Data.Monoid (Sum(..))
+import Data.Foldable (foldMap)
+import Data.Ix (range)
+import Data.Array (Array, accumArray, (!), listArray, assocs)
+import Numeric
 
 import Stats
 import DTree
@@ -59,13 +64,11 @@ updateSeed seed q dir = let (left, right) = partition (sfilter q . snd) seed
 proposeSplits :: Seed -> [Q]
 
 -- Introducing this function requires answering questions about how to
--- choose the initial A/not-A division. For the moment, we'll take a
--- cue from the agglomerative model and split it by vowel/consonant to
--- start.
+-- choose the initial A/not-A division. Here are three options.
 
-defaultSplits = ("aeiou ", "bcdfghjklmnpqrstvwxyz")
--- defaultSplits = ("acegikmoqsuwy ", "bdfhjlnprtvxz")
-
+vowelSplits   = ("aeiou ", "bcdfghjklmnpqrstvwxyz")
+defaultSplits = ("acegikmoqsuwy ", "bdfhjlnprtvxz")
+maximalSplits = ("aeilnorst ","bcdfghjkmpquvwxyz")
 
 -- Then, we'll perform an update for each index
 proposeSplits seed = map (chouImprove defaultSplits seed) [0..(n-1)]
@@ -124,8 +127,7 @@ chouImprove (a0, nota0) obs idx = chouImprove' (a0, nota0)
           in if a == a' then
                  Q idx a' nota'
              else
-                 chouImprove' (seq (unsafePerformIO $ print (idx, a', nota')) a', nota')
-             
+                 chouImprove' (a', nota')
 
           
 growChouModel :: [(Char, Pred)] -> DTree Q Double
@@ -139,11 +141,58 @@ growChouModel obs = growTree
                     (\old new -> old - new > 0.005)
 
 makeObs :: String -> [(Char, Pred)]
-makeObs str = zip str (zipWith3 (\a b c -> [a, b, c]) 
-                                    (tail str)
-                                    (tail $ tail str)
-                                    (tail $ tail $ tail str))
+makeObs str = zipWith4 
+              (\a b c d -> (d, [a, b, c])) 
+              (tail str)
+              (tail $ tail str)
+              (tail $ tail $ tail str)
+              (tail $ tail $ tail $ tail str)
 
+unStar :: Double -> Double
+unStar a = a**2/(1-a**2)
 
-main = do tr <- readFile "textA.txt"
-          sequence $ map print $ proposeSplits (makeObs tr)
+main = do 
+  -- Get the test and training data
+  train <- readFile "textA.txt"
+  test <- readFile "textB.txt"
+  -- Split it for training the smoother and create bitstream
+  -- observations :: (Char, Pred)
+  let (train_obs, held_obs) = splitAt 25000 $ makeObs train
+      test_obs  = makeObs test
+  -- Grow the actual tree and store the frequencies along it
+  let tr = growChouModel train_obs
+      ftr = freqDTree tr train_obs
+  -- Compute a grid for optimizing the smoother
+  let n = 2
+      pars = range ((1, 1), (n-1, n-1))
+      grid = listArray ((1,1), (n-1, n-1)) $ 
+             map (\(i, j) -> 
+                  perplexity 
+                  ftr 
+                  (unStar $ (fromIntegral i)/(fromIntegral n), 
+                   unStar $ (fromIntegral j)/(fromIntegral n))
+                  held_obs)
+             pars
+  -- Using some optimal beta parameters, compute perplexity on the
+  -- training and test data sets
+  let betaparams = (1, 10000000)
+  putStrLn $ "Test:  " ++ (show $ perplexity ftr betaparams test_obs)
+  putStrLn $ "Train: " ++ (show $ perplexity ftr betaparams train_obs)
+  putStrLn $ show $ foldMap (const (Sum 1)) tr
+  -- Store some output files for analysis and presentation
+  writeFile "html/dtree.js" $ dTreeJSON tr 
+                (\(Q idx l _) -> 
+                     show (idx + 1) -- ++ ":" ++ l
+                )
+  writeFile "html/lik.js" $ "var lik = [" ++
+                (concat $ map (++",") $
+                 map show $ loglik ftr betaparams test_obs)
+                ++ "]"
+  writeFile "html/grid.js" $ "var grid = [\n" ++
+                (concat $ map (\((i, j), v) -> 
+                               "{x: " ++ show i ++
+                               ", y: " ++ show j ++ 
+                               ", v: " ++ show v ++ 
+                               "},\n") $ assocs grid) 
+                ++ "]"
+

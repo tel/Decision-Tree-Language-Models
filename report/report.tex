@@ -4,6 +4,10 @@
 \usepackage{listings}
 \usepackage{graphicx}
 \usepackage{nopageno}
+\usepackage{paralist}
+\usepackage{sparklines}
+\usepackage{tabularx}
+\usepackage{booktabs}
 \usepackage{color}
 
 \definecolor{listingbg}{rgb}{0.99, 0.96, 1}
@@ -33,6 +37,7 @@
 
 \DeclareMathOperator*{\argmax}{arg\,max}
 \DeclareMathOperator*{\Merge}{Merge}
+\DeclareMathOperator*{\Range}{Range}
 
 \renewcommand{\Pr}[1]{\ensuremath{\mathrm{Pr}\{ #1 \}}}
 
@@ -261,9 +266,9 @@ agglomerative tree over English letters, to generate a 4-gram
 prediction task of English spelling, a decision tree was generated
 according to the above algorithm. This involved searching through a
 list of 3 questions at each potential branching decision, one for each
-history letter. The final tree has 118 fully-specified ``leaf''
+history letter. The final tree has 125 fully-specified ``leaf''
 distributions corresponding to a complete partitioning of the trigram
-histories into 118 fine-grained equivalence classes.
+histories into 125 fine-grained equivalence classes.
 
 Various representations of the questions asked in the tree are shown
 in Figures \ref{fig:bs_wedges} and \ref{fig:bs_examplepaths}. In
@@ -315,7 +320,7 @@ so long as the probability assigned was non-zero.
   \centering
   \vspace{-1in}
   \makebox[\textwidth]{\includegraphics[width=7in]{bs_path_270}}
-  \caption{\textbf{All 118 ``question paths'' extracted from the
+  \caption{\textbf{All 125 ``question paths'' extracted from the
       experimental decision tree.} The $x$-axis in each small multiple
     plot corresponds to an index into the concatenated bitstring
     $\langle b_1 b_2 b_3 \rangle$ where $b_i$ is the bitstring
@@ -341,5 +346,111 @@ so long as the probability assigned was non-zero.
 %     pairs across all paths in the decision tree.}
 %   \label{fig:bs_jumpcounts}
 % \end{figure}
+
+\section{Using Chou-type questions}
+
+While bitstring encoding of the alphabet is a logical way to
+parameterize the space of permissible questions, that parameterization
+reduces the space of questions greatly (after all, only 3 questions
+are considered at any particular branch point). Chou's algorithm is a
+way to parameterize a much larger space of questions while still
+finding a greedy minimum.
+
+The heart of Chou's algorithm is making allowable questions be of the
+form ``$k(\mathbf{h}) \in \mathcal{A}$?'' where $k(\cdot)$ is some kind
+of keying function, and $\mathcal{A}$ is a chosen subset of
+$\Range(k)$. Thus, for a fixed $k(\cdot)$, selection questions in this
+class involves finding the $\mathcal{A}$ which minimizes some cost
+function (entropy, or, used here, the Gini Index).
+
+Since this problem is still prohibitively large with
+$2^{|\Range(k)-1|}$ options ($\sim 137$M for $\Range(k)$ being the
+English alphabet) to search though, Chou's algorithm provides a method
+of making a step $\mathcal{A}_{n} \to \mathcal{A}_{(n+1)}$ which
+reduces the cost function and thus can be used iteratively to find a
+locally optimal $\mathcal{A}$.
+
+Of course, since the Chou algorithm only finds a locally optimal
+$\mathcal{A}$, it's necessary to consider the sensitivity of the
+algorithm to the bootstrapping $\mathcal{A}_0$ set.
+
+\subsection{Experimental results}
+
+A decision tree was formed by the Chou model using an identical
+training and testing data set as the bitstring model. Considering the
+abovementioned $\mathcal{A}_0$ sensitivity, three choices of
+$\mathcal{A}_0$ were used \begin{inparaenum} 
+\item the agglomerative model's first split: vowels and consontents
+\item an uninformative split taking every other letter in alphabet
+  order ($\mathcal{A}_0$ = \texttt{"acegikmoqsuwy "})
+\item a maximum entropy choice found by searching once over all 137
+  million choices of $\mathcal{A}_0$ (incidentally, $(\mathcal{A},
+  \bar{\mathcal{A}}) = (\mathtt{"aeilnorst
+    "},\texttt{"bcdfghjkmpquvwxyz"})$)
+\end{inparaenum}. 
+
+Various parametric choices of the Chou-style decision tree and their
+performance are summarized in Figure \ref{fig:stop-cutoff}. Of note,
+the Chou-style trees tend to perform slightly ($< 1$ unit perplexity
+improvement) better than similarly sized bitstream model
+trees. Moreover, while the ``Alternating'' style $\mathcal{A}_0$
+choice was rather arbitrary, it performs similarly to the maximal
+entropy choice. Both of those, however, out perform the
+vowel+consonant split $\mathcal{A}_0$ suggesting that such an informed
+choice of $\mathcal{A}_0$ leads to an underexplored search space as
+the Chou algorithm can quickly get stuck in local optima near that
+solution.
+
+\begin{figure}
+  \centering
+  \begin{tabularx}{\textwidth}{ lXXXX }
+    & Unigram model & Vowel & Alternating & Maximum Entropy \\
+    \toprule
+    \textit{$5\times10^{-3}$ cutoff} & & & & \\
+    \midrule
+    \textit{Perplexity} & 17.05 & 10.55 & 8.06 & 8.36 \\
+    \textit{Leaf count} & 1     & 100   & 302  & 248  \\
+    \\
+    \textit{$5\times10^{-4}$ cutoff} & & & & \\
+    \midrule
+    \textit{Perplexity} & 17.05 & 10.03 & 7.41 & 7.82 \\
+    \textit{Leaf count} & 1     & 156   & 382  & 328  \\
+    \bottomrule
+  \end{tabularx}
+  \caption{\textbf{Perplexity and leaf count for various Gini index
+      cutoff values.} ``Cutoff'' denotes the cutoff value that the
+    Gini index of the held-out data set must reduce by in order to
+    accept a split. Unigram model is an unsplit root node decision
+    tree, ``vowel'' represents initial $\mathcal{A}_0$ choices
+    splitting the alphabet by vowels and consonants, ``Alternating''
+    is the $\mathcal{A}_0$ choice such that letters are selected
+    alternatingly in alphabetic order, and ``maximum entropy''
+    represents the set choice $\mathcal{A}_0$ that maximizes entropy
+    of the unigram distribution in the training text over all 137
+    million possibilities.}
+  \label{fig:stop-cutoff}
+\end{figure}
+
+The optimal Chou-style tree (cutoff = $5\times10^{-3}$,
+``Alternating'' style $\mathcal{A}_0$) is pictured in Figure
+\ref{fig:chou-tree} in a convention similar to Figure
+\ref{fig:bs_wedges}. Of immediate note is that the strong tendency to
+query the most recent letter in great detail before considering the
+others has vanished. Instead, though the most recent letter dominates
+the central branches of the tree, questions are arranged with greater
+variety. 
+
+\begin{figure}
+  \centering
+  \makebox[\textwidth]{\includegraphics[width=7in]{chou-tree}}
+  \caption{\textbf{A depiction of the structure of an example
+      Chou-style tree.} Branches of the decision tree radiate outward
+    from the central root node (the circle). Colors and numbers
+    represent which history item $\langle w_1 w_2 w_3 \rangle$ was
+    used for the particular question in that tree branch. Specific
+    sets used to determine each branch split are not depicted to
+    reduce clutter.}
+  \label{fig:chou-tree}
+\end{figure}
 
 \end{document}
