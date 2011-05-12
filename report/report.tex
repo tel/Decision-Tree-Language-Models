@@ -374,6 +374,15 @@ Of course, since the Chou algorithm only finds a locally optimal
 $\mathcal{A}$, it's necessary to consider the sensitivity of the
 algorithm to the bootstrapping $\mathcal{A}_0$ set.
 
+Finally, with the Chou algorithm, there is the question of what to do
+if a certain history is unseen but needs to be assigned to a
+particular Chou optimizing step's $\mathcal{A}$. In this case, without
+any data to suggest a solution, the algorithm described here takes a
+``left default'' stance and moves those histories down the left
+branch. If this occurs later during a likelihood evaluation, however,
+it's also necessary to use distribution smoothing. The same smoothing
+method as described for the bitstream encoded tree is used here.
+
 \subsection{Experimental results}
 
 A decision tree was formed by the Chou model using an identical
@@ -388,6 +397,13 @@ $\mathcal{A}_0$ were used \begin{inparaenum}
   \bar{\mathcal{A}}) = (\mathtt{"aeilnorst
     "},\texttt{"bcdfghjkmpquvwxyz"})$)
 \end{inparaenum}. 
+
+Smoothing parameters, also estimated using grid search over
+$(\alpha^\star, \beta^\star)$, were identically optimized as the
+bitstream tree again providing evidence that the leaf node
+distributions do the best job of estimating the data even in spite of
+impossible scenarios: just a small amount of probability weight put
+into impossible events mitigates their effect.
 
 Various parametric choices of the Chou-style decision tree and their
 performance are summarized in Figure \ref{fig:stop-cutoff}. Of note,
@@ -452,5 +468,26 @@ variety.
     reduce clutter.}
   \label{fig:chou-tree}
 \end{figure}
+
+\section{Conclusion}
+
+In conclusion, tree based language models allow for very
+computationally feasible language models which query increasingly
+complex parameters of the history. In fact, both algorithms are able
+to use greedy method to transform searches which have steps that are
+exponential in history size to those merely polynomial.
+
+While theoretically there is a great deal of difference between the
+greedy methods that decide on the questions used in the decision tree,
+within the limits of only using 4-gram history, it appears that both
+the highly constrained bitstring method and the more general Chou
+method perform roughly equivalently. 
+
+The benefit comes from the ability to consider larger histories with
+ease. For instance, increasing the Chou-style question model used here
+to search for questions in 6-grams involves changing a single function
+and reduces the model perplexity to 7.07 while less than doubling the
+time to train and estimate. This would be clearly impossible using
+more naive models of history equivalences.
 
 \end{document}
