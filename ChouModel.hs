@@ -10,9 +10,11 @@ module Main where
 import System.IO.Unsafe (unsafePerformIO)
 
 import qualified Data.IntMap as IM
-import Data.List (partition, foldl')
+import Data.List (partition, foldl', nub, sortBy)
+import Data.Ord (comparing)
 import Data.Char (ord, chr)
 import Data.Maybe (fromMaybe)
+import Data.Array (Array, accumArray, (!))
 
 import Stats
 import DTree
@@ -62,41 +64,68 @@ proposeSplits :: Seed -> [Q]
 -- start.
 
 defaultSplits = ("aeiou ", "bcdfghjklmnpqrstvwxyz")
+-- defaultSplits = ("acegikmoqsuwy ", "bdfhjlnprtvxz")
+
 
 -- Then, we'll perform an update for each index
--- proposeSplits seed = map (chouImprove defaultSplits seed) [0..(n-1)]
---     where n = length $ snd $ head seed
-proposeSplits = undefined
+proposeSplits seed = map (chouImprove defaultSplits seed) [0..(n-1)]
+    where n = length $ snd $ head seed
 
+-- We'll introduce the domain of letters...
 alphabet = "abcdefghijklmnopqrstuvwxyz "
 
-newtype M = M Int
-instance Show M where
-    show (M 0) = ""
-    show (M i) = "I" ++ show (M (i-1))
+-- And a strictly ordered mapping of this domain
+myOrd :: Char -> Int
+myOrd ' ' = ord 'z' + 1
+myOrd c = ord c
+
+myOrdRange = ((myOrd 'a', myOrd 'a'), (myOrd ' ', myOrd ' '))
 
 chouImprove :: (String, String) -> Seed -> Int-> Q
 chouImprove (a0, nota0) obs idx = chouImprove' (a0, nota0)
-    where chouImprove' (a, nota) =
-              let (a', nota') = 
-                      {-# SCC "part" #-} partition (\x -> score a x <= score nota x) alphabet
-              in if a == a' then
-                     Q idx a' nota'
-                 else
-                     chouImprove' ((seq (unsafePerformIO $ print (a', nota')) a'), nota')
-          n  = fromIntegral $ length obs
-          betasets = foldl' (\map (l, pred) -> 
-                                 IM.insertWith (++)
-                                       (ord (pred !! idx)) [l] map) 
-                     IM.empty obs
-          set beta = fromMaybe [] $ IM.lookup (ord beta) betasets
-          condfreq beta = freqFrom $ set beta
-          condfr beta x = freqOf x (condfreq beta)
-          ct beta = length $ set beta
-          frb beta = (fromIntegral $ ct beta)/n
-          fra set x = (sum $ map (\l -> condfr l x * frb l) set)/(sum $ map frb set)
-          score a x = sum $ map (\beta -> (condfr beta x - fra a x)**2) alphabet
-                    
+    where 
+      -- Find the local domain
+      alphabet = sortBy (comparing myOrd) $ nub $ map fst obs
+      -- Define some distributions
+      n  = fromIntegral $ length obs
+      fwb :: Array (Int, Int) Double -- f(w, beta)
+      fwb = accumArray (\count item -> count + (1/n)) 
+            0 myOrdRange $ 
+            map (\(w, pred) -> 
+                     ((myOrd w, myOrd (pred !! idx)), w)) 
+            obs
+      fb :: Array Int Double         -- f(beta)
+      fb = accumArray (\count item -> count + (1/n)) 
+           0 (myOrd 'a', myOrd ' ') $
+           map (\(w, pred) -> 
+                     (myOrd (pred !! idx), w))
+           obs
+      -- Wrap the accessor so we don't have to manage the ordinal mapping
+      getfwb :: Char -> Char -> Double
+      getfwb w beta = fwb ! (myOrd w, myOrd beta)
+      getfb :: Char -> Double
+      getfb beta = fb ! (myOrd beta)
+      -- This also gets us the conditional, w given b
+      getfwgb :: Char -> Char -> Double
+      getfwgb w beta = if getfb beta /= 0 then (getfwb w beta)/(getfb beta) 
+                       else 0
+      -- Define the set mapping f(w | set)
+      getfset :: Char -> String -> Double
+      getfset w set = if (sum $ map getfb set) /= 0 
+                      then (sum $ map (getfwb w) set)/(sum $ map getfb set)
+                      else 0
+      -- And now we can define the Gini index derived score we're trying to minimize
+      score :: String -> Char -> Double
+      score set beta = sum $ map (\w -> (getfset w set - getfwgb w beta)**2) alphabet
+      -- And that gives us the Chou improvement algorithm
+      chouImprove' (a, nota) =
+          let (a', nota') = 
+                  partition (\x -> score a x <= score nota x) alphabet
+          in if a == a' then
+                 Q idx a' nota'
+             else
+                 chouImprove' (seq (unsafePerformIO $ print (idx, a', nota')) a', nota')
+             
 
           
 growChouModel :: [(Char, Pred)] -> DTree Q Double
@@ -116,6 +145,5 @@ makeObs str = zip str (zipWith3 (\a b c -> [a, b, c])
                                     (tail $ tail $ tail str))
 
 
-tr = unsafePerformIO $ readFile "textA.txt"
-
-main = print $ chouImprove defaultSplits (makeObs tr) 2
+main = do tr <- readFile "textA.txt"
+          sequence $ map print $ proposeSplits (makeObs tr)
