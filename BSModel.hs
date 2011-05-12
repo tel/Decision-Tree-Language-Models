@@ -7,8 +7,6 @@
 
 module Main where
 
-import System.IO.Unsafe (unsafePerformIO)
-
 import Data.Array (Array(..), (!), listArray, bounds, assocs)
 import Data.Ix (inRange, range)
 import qualified Data.Map as M (lookup, toList)
@@ -18,6 +16,7 @@ import Data.Maybe (fromJust)
 import Stats
 import DTree
 import Util
+import Agglomeration (unfoldClusterTree)
 
 -- Admissible questions are of the form (<predictor id>, <bitstring index>)
 type Q = (Int, Int)
@@ -64,7 +63,7 @@ growBSModel obs = growTree
 tree1 :: BTree Char
 tree1 = read "(((((a o) (i u)) e)  ) ((((((((v z) k) m) f) (((j q) b) p)) ((c w) t)) h) ((((r x) l) n) ((s y) (d g)))))"
 
--- We'll generate independent samples using 4-grams
+-- Builds some 4 grams
 makeObs :: DTree s Char -> String -> Maybe [(Char, Pred)]
 makeObs tree str = mapM fn fourgrams
     where bs        = pathMap tree
@@ -77,56 +76,66 @@ makeObs tree str = mapM fn fourgrams
                                           (cenc ++ benc ++ aenc)
                                return $ (d, full)
 
-train = unsafePerformIO (readFile "textA.txt")
-traino = fromJust $ makeObs tree1 $ train
-test = unsafePerformIO (readFile "textB.txt")
-testo = fromJust $ makeObs tree1 $ test
-tr = growBSModel traino
-ftr = freqDTree tr traino
-
 unStar :: Double -> Double
 unStar a = a**2/(1-a**2)
 
-main = do train <- readFile "textA.txt"
-          test <- readFile "textB.txt"
-          let (train_obs, held_obs) = splitAt 25000 $ fromJust $ makeObs tree1 train
-              test_obs  = fromJust $ makeObs tree1 test
-              tr = growBSModel train_obs
-              ftr = freqDTree tr train_obs
-              n = 2
-              pars = range ((1, 1), (n-1, n-1))
-              grid = listArray ((1,1), (n-1, n-1)) $ map (\(i, j) -> 
-                             perplexity 
-                             ftr 
-                             (unStar $ (fromIntegral i)/(fromIntegral n), 
-                              unStar $ (fromIntegral j)/(fromIntegral n))
-                             held_obs)
-                    pars
-              betaparams = (1, 10000000)
-          putStrLn $ "Test:  " ++ (show $ perplexity ftr betaparams test_obs)
-          putStrLn $ "Train: " ++ (show $ perplexity ftr betaparams train_obs)
-          writeFile "html/dtree.js" $ dTreeJSON tr showBSQ
-          writeFile "html/lik.js" $ "var lik = [" ++
-                        (concat $ map (++",") $
-                             map show $ loglik ftr betaparams test_obs)
-                        ++ "]"
-          writeFile "html/grid.js" $ "var grid = [\n" ++
-                        (concat $ map (\((i, j), v) -> 
-                                           "{x: " ++ show i ++
-                                           ", y: " ++ show j ++ 
-                                           ", v: " ++ show v ++ 
-                                           "},\n") $ assocs grid) 
-                        ++ "]"
-          writeFile "paths.csv" $ concat $ map 
-                        (\((i, j), path, step) ->
-                             show i ++ ", " ++ 
-                             show j ++ ", " ++ 
-                             show path ++ ", " ++ 
-                             show step ++ "\n") $
-                        zip3 (concat $ paths) ids steps
-              where paths = map (qsteps tr []) $ map snd $ M.toList $ pathMap tr
-                    ids   = concat $ zipWith ($) (map (\n -> replicate n) $ map length paths) [1..]
-                    steps = concat $ map (\n -> [0..(n-1)]) $ map length paths
-                    qsteps (Branch q l r) acc (L:path) = qsteps l (q:acc) path
-                    qsteps (Branch q l r) acc (R:path) = qsteps r (q:acc) path
-                    qsteps (Leaf _) acc path = reverse acc
+alphabet = "abcdefghijklmnopqrstuvwxyz "
+
+main = do
+  -- Get the test and training data
+  train <- readFile "textA.txt"
+  test <- readFile "textB.txt"
+  -- Get some frequencies and compute the agglomerative tree
+  let freq1gram = freqFrom train
+      freq2gram = freqFrom (zip train (tail train))
+      tree1 = unfoldClusterTree freq1gram freq2gram alphabet
+  -- Split it for training the smoother and create bitstream
+  -- observations :: (Char, Pred)
+  let (train_obs, held_obs) = splitAt 25000 $ fromJust $ makeObs tree1 train
+      test_obs  = fromJust $ makeObs tree1 test
+  -- Grow the actual tree and store the frequencies along it
+  let tr = growBSModel train_obs
+      ftr = freqDTree tr train_obs
+  -- Compute a grid for optimizing the smoother
+  let n = 2
+      pars = range ((1, 1), (n-1, n-1))
+      grid = listArray ((1,1), (n-1, n-1)) $ 
+             map (\(i, j) -> 
+                  perplexity 
+                  ftr 
+                  (unStar $ (fromIntegral i)/(fromIntegral n), 
+                   unStar $ (fromIntegral j)/(fromIntegral n))
+                  held_obs)
+             pars
+  -- Using some optimal beta parameters, compute perplexity on the
+  -- training and test data sets
+  let betaparams = (1, 10000000)
+  putStrLn $ "Test:  " ++ (show $ perplexity ftr betaparams test_obs)
+  putStrLn $ "Train: " ++ (show $ perplexity ftr betaparams train_obs)
+  -- Store some output files for analysis and presentation
+  writeFile "html/dtree.js" $ dTreeJSON tr showBSQ
+  writeFile "html/lik.js" $ "var lik = [" ++
+                (concat $ map (++",") $
+                 map show $ loglik ftr betaparams test_obs)
+                ++ "]"
+  writeFile "html/grid.js" $ "var grid = [\n" ++
+                (concat $ map (\((i, j), v) -> 
+                               "{x: " ++ show i ++
+                               ", y: " ++ show j ++ 
+                               ", v: " ++ show v ++ 
+                               "},\n") $ assocs grid) 
+                ++ "]"
+  -- Compute the output for showing the paths
+  let paths = map (qsteps tr []) $ map snd $ M.toList $ pathMap tr
+      ids   = concat $ zipWith ($) (map (\n -> replicate n) $ map length paths) [1..]
+      steps = concat $ map (\n -> [0..(n-1)]) $ map length paths
+      qsteps (Branch q l r) acc (L:path) = qsteps l (q:acc) path
+      qsteps (Branch q l r) acc (R:path) = qsteps r (q:acc) path
+      qsteps (Leaf _) acc path = reverse acc
+  writeFile "paths.csv" $ concat $ map 
+                (\((i, j), path, step) ->
+                     show i ++ ", " ++ 
+                     show j ++ ", " ++ 
+                     show path ++ ", " ++ 
+                     show step ++ "\n") $
+                zip3 (concat $ paths) ids steps
