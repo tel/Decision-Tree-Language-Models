@@ -10,16 +10,17 @@ module Stats
       freqFrom, domain, freqOf, entropy, gini,
       log2, lgamma2, lbeta2, lchoose2, betabinom ) where
 
-import Foreign.C.Types
-import Control.Monad (liftM)
-import qualified Data.Foldable as F
-import qualified Data.Set as S
+import Foreign.C.Types ( CDouble )
+import Control.Monad ()
+import qualified Data.Foldable as F ()
+import qualified Data.Set as S ( Set )
 import qualified Data.Map as M
+    ( lookup, Map, empty, insertWith, keys )
 import qualified Data.IntMap as IM
-import Data.Maybe (fromMaybe)
-import Data.List (foldl')
-import Data.Char (ord, chr)
-
+    ( empty, Key, IntMap, insertWith, keys, lookup )
+import Data.Maybe ( fromMaybe )
+import Data.List ( foldl' )
+import Data.Char ( ord, chr )
 
 -- Firstly, a real log2 implementation so that we can deal in bits
 foreign import ccall unsafe "math.h log2"
@@ -80,7 +81,7 @@ instance Ord a => Freq FreqMap (S.Set a) where
     freqFrom = genericFreqFrom
     domain = genericDomain
     freqOf = genericFreqOf
-
+             
 instance Ord a => Freq FreqMap (a, a) where
     freqFrom = genericFreqFrom
     domain = genericDomain

@@ -13,18 +13,18 @@ module DTree
       freqDTree, loglik, perplexity) where
 
 -- Alright.
-import qualified Data.Foldable as F (Foldable, foldr, foldMap, maximum)
-import qualified Data.Map as M
-import Data.List (partition, minimumBy)
-import Data.Ord (comparing)
-import Data.Traversable (Traversable, traverse)
-import Data.Monoid (Monoid)
-import Control.Applicative ((<$>), (<*>))
-import Control.Monad (liftM)
-import Text.Read (lift, readPrec)
-import Text.ParserCombinators.ReadP
-
-import Stats
+import qualified Data.Foldable as F
+    ( Foldable, foldr, foldMap, maximum )
+import qualified Data.Map as M ( union, map, Map, singleton )
+import Data.List ( partition, minimumBy )
+import Data.Ord ( comparing )
+import Data.Traversable ( Traversable, traverse )
+import Data.Monoid ( Monoid )
+import Control.Applicative ( (<$>), (<*>) )
+import Control.Monad ( liftM )
+import Text.Read ( lift, readPrec )
+import Text.ParserCombinators.ReadP ( ReadP, (+++), char, satisfy )
+import Stats ( Freq(domain, freqFrom, freqOf), log2, betabinom )
 
 -- The general decision tree type. It's particularly important to note
 -- that types can be stored at both branch and leaf nodes (important

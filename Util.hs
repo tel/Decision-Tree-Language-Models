@@ -1,6 +1,6 @@
 module Util where
 
-import DTree
+import DTree ( DTree(..) )
 
 dTreeJSON :: Show a => DTree s a -> (s -> String) -> String
 dTreeJSON (Leaf x) _ = "var dtree = " ++ show x
